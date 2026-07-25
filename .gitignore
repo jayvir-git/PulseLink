@@ -1,0 +1,31 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
+pulselink.db*
+.vs/
+
+## Node
+frontend/node_modules/
+frontend/dist/
+
+## OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+## Secrets / env
+.env
+.env.local
+appsettings.*.local.json
+
+## Local-only notes (never publish)
+.local/
+private/
+.cursor/rules/*.local.mdc

@@ -1,0 +1,14 @@
+---
+description: PulseLink product context and engineering non-negotiables
+alwaysApply: true
+---
+
+# PulseLink context
+
+- **PulseLink** is an EMS→hospital handoff application (C#/.NET, SQL, React/TS, Azure-ready).
+- Core flow: Paramedic PCR → vitals/interventions → status machine → hospital view → FHIR-like export + audit.
+- Stack: `PulseLink.Api` / `Core` / `Infrastructure` / `Tests` + `frontend` (Vite React TS). SQLite local; Azure SQL covered in docs.
+- Seeded users (`Demo123!`): `paramedic@pulselink.demo`, `hospital@pulselink.demo`, `admin@pulselink.demo`.
+- Before large changes, read `AGENTS.md` and `docs/architecture.md`. Prefer finishing deploy/README polish over unrelated features.
+- Keep domain rules in `IncidentStatusMachine`; maintain role-based access and audit logging.
+- Keep committed docs and comments product-focused. Do not add personal career framing to this repository.

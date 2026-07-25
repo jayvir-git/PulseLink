@@ -1,0 +1,391 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap');
+
+:root {
+  --bg: #eef3f1;
+  --bg-accent: #d9e7e2;
+  --ink: #13201c;
+  --muted: #4d635b;
+  --panel: rgba(255, 255, 255, 0.82);
+  --line: #c5d5ce;
+  --brand: #0f6a56;
+  --brand-deep: #0b4a3c;
+  --warn: #8a3b12;
+  --danger: #8b1e1e;
+  --shadow: 0 18px 50px rgba(19, 32, 28, 0.08);
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(15, 106, 86, 0.14), transparent 36%),
+    linear-gradient(180deg, #f7faf8 0%, var(--bg) 45%, var(--bg-accent) 100%);
+  line-height: 1.45;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--brand-deep);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+button,
+.button {
+  appearance: none;
+  border: none;
+  background: var(--brand);
+  color: white;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.ghost,
+.ghost {
+  background: transparent;
+  color: var(--brand-deep);
+  border: 1px solid var(--line);
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  background: white;
+}
+
+label {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(197, 213, 206, 0.9);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-mark {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(145deg, #14856c, #0b4a3c);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+.brand strong {
+  display: block;
+  font-family: 'IBM Plex Serif', serif;
+  font-size: 1.15rem;
+}
+
+.brand small {
+  color: var(--muted);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.topbar-right nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+main {
+  padding: 1.5rem;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.page.narrow {
+  max-width: 680px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand);
+  margin: 0 0 0.35rem;
+}
+
+h1 {
+  font-family: 'IBM Plex Serif', serif;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  margin: 0 0 0.4rem;
+  letter-spacing: -0.02em;
+}
+
+h2,
+h3 {
+  margin-top: 0;
+}
+
+.lede {
+  color: var(--muted);
+  margin: 0;
+  max-width: 48rem;
+}
+
+.stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.stack.tight {
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.grid-2,
+.grid-3 {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.login-panel,
+.panel,
+.card-form,
+.table-wrap {
+  background: var(--panel);
+  border: 1px solid rgba(197, 213, 206, 0.95);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.login-panel {
+  width: min(100%, 460px);
+  padding: 2rem;
+}
+
+.demo-accounts {
+  margin-top: 1.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.status {
+  display: inline-flex;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #e4ece8;
+  color: var(--brand-deep);
+}
+
+.status-transporting,
+.status-arrived {
+  background: #ffe8c7;
+  color: var(--warn);
+}
+
+.status-handedoff {
+  background: #d9f0e7;
+  color: var(--brand-deep);
+}
+
+.detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel {
+  padding: 1.2rem;
+}
+
+.meta {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.meta div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.meta dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.meta dd {
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.list li {
+  display: grid;
+  gap: 0.2rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.list span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.actions {
+  margin-top: 1.25rem;
+}
+
+.export {
+  margin-top: 0.75rem;
+  max-height: 280px;
+  overflow: auto;
+  background: #10231d;
+  color: #d7f5ea;
+  padding: 1rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.card-form {
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 860px) {
+  .detail-grid,
+  .grid-2,
+  .grid-3,
+  .page-header,
+  .topbar {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-right,
+  .user-chip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

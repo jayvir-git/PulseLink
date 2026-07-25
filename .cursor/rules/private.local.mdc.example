@@ -1,0 +1,10 @@
+---
+description: Optional local-only overlay — copy to private.local.mdc (gitignored)
+alwaysApply: true
+---
+
+# Local private overlay
+
+1. Copy this file to `private.local.mdc` (gitignored).
+2. Point agents at any private notes you keep outside this repository.
+3. Never copy personal career framing into tracked project files.
