@@ -27,11 +27,12 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
 
         query = ApplyRoleFilter(query);
 
-        var items = await query
-            .OrderByDescending(i => i.UpdatedAt)
-            .ToListAsync();
+        // SQLite cannot ORDER BY DateTimeOffset in SQL; sort after materializing.
+        var items = await query.ToListAsync();
 
-        return Ok(items.Select(IncidentMapper.ToSummary));
+        return Ok(items
+            .OrderByDescending(i => i.UpdatedAt)
+            .Select(IncidentMapper.ToSummary));
     }
 
     [HttpGet("{id:guid}")]

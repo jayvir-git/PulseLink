@@ -57,6 +57,16 @@ dotnet test PulseLink.sln
 
 See [docs/demo-walkthrough.md](docs/demo-walkthrough.md) for a guided local walkthrough.
 
+## Screenshots
+
+| Login | Paramedic incidents |
+| --- | --- |
+| ![Login](docs/images/login.png) | ![Paramedic incidents](docs/images/paramedic-incidents.png) |
+
+| Incident detail + export | Hospital handoffs |
+| --- | --- |
+| ![Incident detail](docs/images/incident-detail.png) | ![Hospital handoffs](docs/images/hospital-handoffs.png) |
+
 ## Core workflow
 
 1. Paramedic creates a draft incident (chief complaint, destination hospital)
