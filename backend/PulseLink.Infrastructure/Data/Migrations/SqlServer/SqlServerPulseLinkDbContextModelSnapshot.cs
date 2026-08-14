@@ -287,12 +287,23 @@ namespace PulseLink.Infrastructure.Data.Migrations.SqlServer
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AgencyId");
-
                     b.HasIndex("DestinationHospitalId");
 
                     b.HasIndex("IncidentNumber")
                         .IsUnique();
+
+                    b.HasIndex("AgencyId", "UpdatedAtUtc", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("IX_Incidents_Agency_UpdatedAtUtc");
+
+                    b.HasIndex("CreatedByUserId", "UpdatedAtUtc", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("IX_Incidents_CreatedBy_UpdatedAtUtc");
+
+                    b.HasIndex("DestinationHospitalId", "UpdatedAtUtc", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("IX_Incidents_HospitalList")
+                        .HasFilter("Status IN (3, 4, 5)");
 
                     b.ToTable("Incidents");
                 });

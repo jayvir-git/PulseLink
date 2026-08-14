@@ -99,7 +99,7 @@ PulseLink/
     PulseLink.Infrastructure/  EF Core, Identity, seed data
     PulseLink.Tests/           Domain tests
   frontend/                    React + TypeScript UI
-  docs/                        Architecture + walkthrough
+  docs/                        Architecture, walkthrough, database, performance
 ```
 
 ## Design highlights
@@ -110,7 +110,7 @@ PulseLink/
 - Audit events on create/update/status/export
 - Integration stub export for hospital systems
 
-More detail: [docs/architecture.md](docs/architecture.md)
+More detail: [docs/architecture.md](docs/architecture.md). List query indexes: [docs/performance.md](docs/performance.md).
 
 ## Deployment notes
 

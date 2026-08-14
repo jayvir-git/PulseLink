@@ -97,6 +97,36 @@ var app = builder.Build();
 
 await DbSeeder.SeedAsync(app.Services);
 
+if (args.Contains("--seed-load-test")
+    || builder.Configuration.GetValue("Database:SeedLoadTest", false))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PulseLinkDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("LoadTestSeeder");
+    var result = await LoadTestSeeder.SeedAsync(db, LoadTestSeedOptions.Full);
+    logger.LogInformation(
+        "Load-test seed: {Incidents} incidents, {Vitals} vitals, {Interventions} interventions, {Audits} audits. UpdatedAtUtc {Min:u} .. {Max:u} across {Days} distinct days (default rows: {Defaults}).",
+        result.Incidents,
+        result.Vitals,
+        result.Interventions,
+        result.AuditEvents,
+        result.MinUpdatedAtUtc,
+        result.MaxUpdatedAtUtc,
+        result.DistinctDays,
+        result.DefaultTimestampCount);
+}
+
+if (args.Contains("--capture-load-test-plans"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PulseLinkDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("LoadTestPlanCapture");
+    var outputDir = Path.Combine(app.Environment.ContentRootPath, "..", "..", "artifacts", "load-test-plans");
+    var report = await LoadTestPlanCapture.RunAsync(db, outputDir);
+    logger.LogInformation("Wrote load-test plans to {Path}", report);
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

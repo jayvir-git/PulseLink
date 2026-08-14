@@ -105,3 +105,14 @@ Production should apply migrations as its own step, then start the API:
 2. Start the API with `Database:Provider=SqlServer` (or SQLite) and `ASPNETCORE_ENVIRONMENT` not Development.
 
 To force startup migrate outside Development (a single-instance box, a one-off recover), set `Database:MigrateOnStartup` to `true`. Leave it unset in production.
+
+## Load-test seed (not the demo seed)
+
+For index and plan measurement only. Not used in CI or the normal `dotnet run` path.
+
+```bash
+cd backend/PulseLink.Api
+dotnet run --launch-profile http-localdb -- --seed-load-test --capture-load-test-plans
+```
+
+The seeder bulk-inserts, so it sets `Incident.UpdatedAtUtc` explicitly (SaveChanges sync does not run). After seed it asserts no default timestamps and a spread across many days. Plans and numbers: [performance.md](performance.md).

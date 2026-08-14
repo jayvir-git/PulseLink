@@ -47,6 +47,17 @@ public class PulseLinkDbContext : IdentityDbContext<AppUser>
             e.Property(x => x.Notes).HasMaxLength(2000);
             e.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
             e.Property(x => x.UpdatedAtUtc).IsRequired();
+            e.HasIndex(x => x.DestinationHospitalId);
+            e.HasIndex(x => new { x.DestinationHospitalId, x.UpdatedAtUtc, x.Id })
+                .HasDatabaseName("IX_Incidents_HospitalList")
+                .IsDescending(false, true, true)
+                .HasFilter("Status IN (3, 4, 5)");
+            e.HasIndex(x => new { x.AgencyId, x.UpdatedAtUtc, x.Id })
+                .HasDatabaseName("IX_Incidents_Agency_UpdatedAtUtc")
+                .IsDescending(false, true, true);
+            e.HasIndex(x => new { x.CreatedByUserId, x.UpdatedAtUtc, x.Id })
+                .HasDatabaseName("IX_Incidents_CreatedBy_UpdatedAtUtc")
+                .IsDescending(false, true, true);
             e.HasOne(x => x.Agency).WithMany(a => a.Incidents).HasForeignKey(x => x.AgencyId);
             e.HasOne(x => x.DestinationHospital).WithMany(h => h.Incidents)
                 .HasForeignKey(x => x.DestinationHospitalId)

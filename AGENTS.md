@@ -26,7 +26,7 @@ EMS → hospital care continuity:
 ```text
 backend/PulseLink.Api|Core|Infrastructure|Tests
 frontend/                 React UI
-docs/                     architecture, demo-walkthrough, database
+docs/                     architecture, demo-walkthrough, database, performance
 ```
 
 ## Seeded local users (password `Demo123!`)
@@ -51,7 +51,7 @@ cd backend/PulseLink.Api && dotnet run --launch-profile http-localdb
 cd frontend && npm run dev
 ```
 
-Migrations: SQLite is the default set (`SqlitePulseLinkDbContext`, `Data/Migrations/Sqlite`). SQL Server is a separate set (`SqlServerPulseLinkDbContext`, `Data/Migrations/SqlServer`). Commands and startup-vs-deploy migrate behavior: [docs/database.md](docs/database.md).
+Migrations: SQLite is the default set (`SqlitePulseLinkDbContext`, `Data/Migrations/Sqlite`). SQL Server is a separate set (`SqlServerPulseLinkDbContext`, `Data/Migrations/SqlServer`). Commands and startup-vs-deploy migrate behavior: [docs/database.md](docs/database.md). List indexes and measured plans: [docs/performance.md](docs/performance.md).
 
 ## Engineering guardrails
 

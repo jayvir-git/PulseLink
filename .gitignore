@@ -29,3 +29,6 @@ appsettings.*.local.json
 .local/
 private/
 .cursor/rules/*.local.mdc
+
+## Load-test plan captures
+artifacts/

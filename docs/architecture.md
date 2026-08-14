@@ -10,7 +10,7 @@ PulseLink is an EMS-to-hospital care continuity application. Paramedics document
 |-------|--------|-------|
 | API | ASP.NET Core 8 (C#) | Controllers + JWT auth |
 | Domain | `PulseLink.Core` | Entities + status state machine |
-| Data | EF Core + SQLite (default) or SQL Server | Provider selected by `Database:Provider`; see [database.md](database.md) |
+| Data | EF Core + SQLite (default) or SQL Server | Provider selected by `Database:Provider`; see [database.md](database.md). List indexes: [performance.md](performance.md) |
 | UI | React + TypeScript (Vite) | Role-aware screens |
 | Auth | ASP.NET Identity + JWT | Roles: Paramedic, HospitalStaff, Admin |
 | Tests | xUnit | Status transition rules |
