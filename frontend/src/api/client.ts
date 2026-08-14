@@ -63,7 +63,8 @@ export const api = {
   agencies: () =>
     request<{ id: string; name: string; region: string }[]>('/api/lookup/agencies'),
 
-  incidents: () => request<IncidentSummary[]>('/api/incidents'),
+  incidents: () =>
+    request<PagedIncidentList>('/api/incidents?page=1&pageSize=50').then((page) => page.items),
 
   incident: (id: string) => request<IncidentDetail>(`/api/incidents/${id}`),
 
@@ -98,6 +99,13 @@ export const api = {
     }),
 
   exportHandoff: (id: string) => request<unknown>(`/api/incidents/${id}/export`),
+};
+
+export type PagedIncidentList = {
+  items: IncidentSummary[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
 };
 
 export type IncidentSummary = {

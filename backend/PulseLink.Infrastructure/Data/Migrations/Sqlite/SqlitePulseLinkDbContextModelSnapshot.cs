@@ -272,6 +272,9 @@ namespace PulseLink.Infrastructure.Data.Migrations.Sqlite
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AgencyId");
@@ -350,12 +353,14 @@ namespace PulseLink.Infrastructure.Data.Migrations.Sqlite
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("SpO2")
+                        .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("SystolicBp")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("TemperatureC")
+                        .HasPrecision(4, 1)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

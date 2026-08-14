@@ -17,22 +17,29 @@ namespace PulseLink.Api.Controllers;
 public class IncidentsController(PulseLinkDbContext db) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<IncidentSummaryDto>>> List()
+    public async Task<ActionResult<PagedIncidentListDto>> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = IncidentListQuery.DefaultPageSize)
     {
-        var query = db.Incidents
-            .AsNoTracking()
-            .Include(i => i.Agency)
-            .Include(i => i.DestinationHospital)
-            .AsQueryable();
+        (page, pageSize) = IncidentListQuery.Normalize(page, pageSize);
 
-        query = ApplyRoleFilter(query);
+        var filtered = ApplyRoleFilter(db.Incidents.AsNoTracking());
+        var totalCount = await filtered.CountAsync();
 
-        // SQLite cannot ORDER BY DateTimeOffset in SQL; sort after materializing.
-        var items = await query.ToListAsync();
+        // Order by UpdatedAtUtc (DateTime) so SQLite and SQL Server both sort in SQL.
+        // DateTimeOffset cannot be ORDER BY'd in SQLite; this column exists for that reason.
+        var items = await IncidentListQuery
+            .ApplyOrderAndPage(
+                filtered.Include(i => i.Agency).Include(i => i.DestinationHospital),
+                page,
+                pageSize)
+            .ToListAsync();
 
-        return Ok(items
-            .OrderByDescending(i => i.UpdatedAt)
-            .Select(IncidentMapper.ToSummary));
+        return Ok(new PagedIncidentListDto(
+            items.Select(IncidentMapper.ToSummary).ToList(),
+            page,
+            pageSize,
+            totalCount));
     }
 
     [HttpGet("{id:guid}")]

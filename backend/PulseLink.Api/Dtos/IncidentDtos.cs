@@ -72,6 +72,12 @@ public record IncidentSummaryDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public record PagedIncidentListDto(
+    IReadOnlyList<IncidentSummaryDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
 public record IncidentDetailDto(
     Guid Id,
     string IncidentNumber,

@@ -31,6 +31,15 @@ dotnet run --launch-profile http-localdb
 
 `appsettings.Development.json` contains a non-secret local `sa` password for the compose file. Do not reuse it outside this machine. The LocalDB profile uses Windows authentication and does not store a password.
 
+**Verification status:** SQL Server was verified on this machine with LocalDB (`http-localdb`). `docker-compose.yml` is documented for environments that have Docker; that path has not been run here.
+
+## Provider SQL differences
+
+EF Core generates different store types per provider. Two current examples:
+
+- `DateTimeOffset` is `TEXT` on SQLite and `datetimeoffset` on SQL Server. SQLite cannot `ORDER BY` that type in SQL, which is why `Incident.UpdatedAtUtc` (`DateTime` / UTC) exists as the list-ordering column.
+- `decimal` is `TEXT` on SQLite and a precision/scale numeric on SQL Server. `VitalSign.SpO2` is `decimal(5,2)` and `TemperatureC` is `decimal(4,1)` on SQL Server. Changing those annotations is a real `ALTER COLUMN` there and typically a no-op in the SQLite migration, because SQLite still stores the value as `TEXT`.
+
 ## Two migration sets
 
 SQLite and SQL Server generate different SQL (column types, identity, DateTimeOffset storage). The sets live in separate folders and namespaces and are bound to different DbContext types so EF cannot apply the wrong one.

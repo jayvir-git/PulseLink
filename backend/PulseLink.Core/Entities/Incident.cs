@@ -22,6 +22,7 @@ public class Incident
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
     public DateTimeOffset? HandedOffAt { get; set; }
 
     public ICollection<VitalSign> VitalSigns { get; set; } = [];
