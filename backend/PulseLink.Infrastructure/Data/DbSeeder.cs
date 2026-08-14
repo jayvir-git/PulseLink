@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using PulseLink.Core.Entities;
 using PulseLink.Core.Enums;
 using PulseLink.Infrastructure.Identity;
@@ -15,8 +18,19 @@ public static class DbSeeder
         var db = scope.ServiceProvider.GetRequiredService<PulseLinkDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DbSeeder");
 
-        await db.Database.MigrateAsync();
+        if (DatabaseProvider.ShouldMigrateOnStartup(environment, configuration))
+        {
+            await db.Database.MigrateAsync();
+        }
+        else
+        {
+            logger.LogInformation(
+                "Skipping database migrate at startup. Apply migrations as a deploy step, or set Database:MigrateOnStartup=true.");
+        }
 
         foreach (var role in AppRoles.All)
         {

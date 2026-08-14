@@ -8,7 +8,7 @@ Paramedics document a lightweight patient care report (PCR) in the field, advanc
 
 - **Backend:** ASP.NET Core 8, C#, EF Core, ASP.NET Identity, JWT
 - **Frontend:** React, TypeScript, Vite
-- **Database:** SQLite locally (connection string can point at Azure SQL)
+- **Database:** SQLite locally by default; SQL Server is a second provider (see [docs/database.md](docs/database.md))
 - **Tests:** xUnit
 - **CI:** GitHub Actions
 
@@ -40,6 +40,20 @@ npm run dev
 - App: http://localhost:5173
 
 Vite proxies `/api` to the API during local development.
+
+### SQL Server (optional)
+
+SQLite is the default. To run against SQL Server instead:
+
+```bash
+docker compose up -d
+cd backend/PulseLink.Api
+dotnet run --launch-profile http-sqlserver
+```
+
+On Windows without Docker, use LocalDB (`dotnet run --launch-profile http-localdb`).
+
+Migration commands, provider settings, and how production should apply schema changes: [docs/database.md](docs/database.md).
 
 ### Tests
 
@@ -100,4 +114,4 @@ More detail: [docs/architecture.md](docs/architecture.md)
 
 ## Deployment notes
 
-The data model and connection-string configuration can target Azure SQL. Typical cloud layout: API on Azure App Service, frontend on Azure Static Web Apps, JWT signing key in App Settings or Key Vault. See the architecture doc for concrete steps.
+The data model supports SQLite (local default) and SQL Server. Typical cloud layout: API on Azure App Service, frontend on Azure Static Web Apps, JWT signing key in App Settings or Key Vault, Azure SQL with `Database:Provider=SqlServer`. See [docs/database.md](docs/database.md) and the architecture doc for concrete steps.

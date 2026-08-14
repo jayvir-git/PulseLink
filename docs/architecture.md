@@ -10,7 +10,7 @@ PulseLink is an EMS-to-hospital care continuity application. Paramedics document
 |-------|--------|-------|
 | API | ASP.NET Core 8 (C#) | Controllers + JWT auth |
 | Domain | `PulseLink.Core` | Entities + status state machine |
-| Data | EF Core + SQLite (local) | Swap connection string to Azure SQL for cloud |
+| Data | EF Core + SQLite (default) or SQL Server | Provider selected by `Database:Provider`; see [database.md](database.md) |
 | UI | React + TypeScript (Vite) | Role-aware screens |
 | Auth | ASP.NET Identity + JWT | Roles: Paramedic, HospitalStaff, Admin |
 | Tests | xUnit | Status transition rules |
@@ -51,26 +51,20 @@ Every create/update/status/export writes an `AuditEvent`.
 ## Azure deployment notes
 
 1. Provision Azure SQL Database (or keep SQLite only for local demos)
-2. Deploy API to Azure App Service (Linux/.NET 8)
-3. Store JWT signing key in Azure Key Vault / App Settings
-4. Deploy frontend to Azure Static Web Apps (or App Service static site)
-5. Set `VITE_API_URL` to the App Service URL
-6. Update CORS origins in API configuration
+2. Set `Database:Provider` to `SqlServer` and `ConnectionStrings:SqlServer` (do not rely on startup migrate in production; apply migrations as a deploy step — [database.md](database.md))
+3. Deploy API to Azure App Service (Linux/.NET 8)
+4. Store JWT signing key in Azure Key Vault / App Settings
+5. Deploy frontend to Azure Static Web Apps (or App Service static site)
+6. Set `VITE_API_URL` to the App Service URL
+7. Update CORS origins in API configuration
 
-Local default connection string:
+Local SQLite (default):
 
 ```json
+"Database": { "Provider": "Sqlite" },
 "ConnectionStrings": {
   "Default": "Data Source=pulselink.db"
 }
 ```
 
-Azure SQL example:
-
-```json
-"ConnectionStrings": {
-  "Default": "Server=tcp:<server>.database.windows.net,1433;Database=pulselink;User ID=...;Password=...;Encrypt=True;"
-}
-```
-
-When moving to Azure SQL, add `Microsoft.EntityFrameworkCore.SqlServer` and switch `UseSqlite` → `UseSqlServer` in `DependencyInjection.cs`.
+Local SQL Server (Docker) and Azure SQL examples: [database.md](database.md).

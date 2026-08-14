@@ -11,11 +11,30 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Default")
-            ?? "Data Source=pulselink.db";
+        var provider = DatabaseProvider.Read(configuration);
 
-        services.AddDbContext<PulseLinkDbContext>(options =>
-            options.UseSqlite(connectionString));
+        if (provider == DatabaseProvider.SqlServer)
+        {
+            var connectionString = configuration.GetConnectionString("SqlServer")
+                ?? throw new InvalidOperationException(
+                    "Database:Provider=SqlServer requires ConnectionStrings:SqlServer.");
+
+            services.AddDbContext<SqlServerPulseLinkDbContext>(options =>
+                options.UseSqlServer(connectionString));
+            services.AddScoped<PulseLinkDbContext>(sp =>
+                sp.GetRequiredService<SqlServerPulseLinkDbContext>());
+        }
+        else
+        {
+            var connectionString = configuration.GetConnectionString("Sqlite")
+                ?? configuration.GetConnectionString("Default")
+                ?? "Data Source=pulselink.db";
+
+            services.AddDbContext<SqlitePulseLinkDbContext>(options =>
+                options.UseSqlite(connectionString));
+            services.AddScoped<PulseLinkDbContext>(sp =>
+                sp.GetRequiredService<SqlitePulseLinkDbContext>());
+        }
 
         services.AddIdentity<AppUser, IdentityRole>(options =>
             {

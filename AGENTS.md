@@ -17,7 +17,7 @@ EMS → hospital care continuity:
 
 - Backend: ASP.NET Core 8, C#, EF Core, Identity + JWT
 - Frontend: React + TypeScript (Vite)
-- DB: SQLite locally; docs describe Azure SQL for cloud
+- DB: SQLite locally by default; SQL Server is a second provider (`Database:Provider`)
 - Tests: xUnit (`PulseLink.Tests`)
 - CI: `.github/workflows/ci.yml`
 
@@ -26,7 +26,7 @@ EMS → hospital care continuity:
 ```text
 backend/PulseLink.Api|Core|Infrastructure|Tests
 frontend/                 React UI
-docs/                     architecture, demo-walkthrough
+docs/                     architecture, demo-walkthrough, database
 ```
 
 ## Seeded local users (password `Demo123!`)
@@ -38,12 +38,20 @@ docs/                     architecture, demo-walkthrough
 ## Run locally
 
 ```bash
-# API — http://localhost:5080
+# API — http://localhost:5080 (SQLite default)
 cd backend/PulseLink.Api && dotnet run --launch-profile http
+
+# API against local SQL Server Docker (docker compose up -d first)
+cd backend/PulseLink.Api && dotnet run --launch-profile http-sqlserver
+
+# API against SQL Server LocalDB on Windows
+cd backend/PulseLink.Api && dotnet run --launch-profile http-localdb
 
 # UI — http://localhost:5173 (proxies /api)
 cd frontend && npm run dev
 ```
+
+Migrations: SQLite is the default set (`SqlitePulseLinkDbContext`, `Data/Migrations/Sqlite`). SQL Server is a separate set (`SqlServerPulseLinkDbContext`, `Data/Migrations/SqlServer`). Commands and startup-vs-deploy migrate behavior: [docs/database.md](docs/database.md).
 
 ## Engineering guardrails
 

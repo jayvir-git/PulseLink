@@ -7,7 +7,7 @@ namespace PulseLink.Infrastructure.Data;
 
 public class PulseLinkDbContext : IdentityDbContext<AppUser>
 {
-    public PulseLinkDbContext(DbContextOptions<PulseLinkDbContext> options) : base(options)
+    public PulseLinkDbContext(DbContextOptions options) : base(options)
     {
     }
 

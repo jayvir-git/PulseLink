@@ -2,20 +2,17 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PulseLink.Infrastructure.Data;
 
 #nullable disable
 
-namespace PulseLink.Infrastructure.Data.Migrations
+namespace PulseLink.Infrastructure.Data.Migrations.Sqlite
 {
-    [DbContext(typeof(PulseLinkDbContext))]
-    [Migration("20260814201451_InitialCreate")]
-    partial class InitialCreate
+    [DbContext(typeof(SqlitePulseLinkDbContext))]
+    partial class SqlitePulseLinkDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
