@@ -21,7 +21,9 @@ public static class LocalDb
 {
     public const string Server = @"(localdb)\MSSQLLocalDB";
 
-    private static readonly Lazy<bool> Available = new(Probe, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Lazy<bool> Available = new(
+        () => Detect(OperatingSystem.IsWindows(), ConnectMaster),
+        LazyThreadSafetyMode.ExecutionAndPublication);
 
     public static bool IsAvailable => Available.Value;
 
@@ -44,21 +46,31 @@ public static class LocalDb
         await cmd.ExecuteNonQueryAsync();
     }
 
-    private static bool Probe()
+    /// <summary>
+    /// Capability check used by <see cref="IsAvailable"/>. Must never throw:
+    /// the fact attribute constructor runs during xUnit discovery.
+    /// </summary>
+    internal static bool Detect(bool isWindows, Func<bool> connect)
     {
+        if (!isWindows)
+        {
+            return false;
+        }
+
         try
         {
-            using var conn = new SqlConnection(ConnectionString("master"));
-            conn.Open();
-            return true;
+            return connect();
         }
-        catch (SqlException)
+        catch
         {
             return false;
         }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
+    }
+
+    private static bool ConnectMaster()
+    {
+        using var conn = new SqlConnection(ConnectionString("master"));
+        conn.Open();
+        return true;
     }
 }
