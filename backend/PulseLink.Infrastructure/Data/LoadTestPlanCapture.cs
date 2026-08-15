@@ -109,20 +109,14 @@ public static class LoadTestPlanCapture
                 || i.Status == IncidentStatus.Arrived
                 || i.Status == IncidentStatus.HandedOff));
 
-        var paramedicFilter = db.Incidents.AsNoTracking().Where(i =>
-            i.AgencyId == LoadTestIds.MetroAgencyId
-            || i.CreatedByUserId == LoadTestIds.MetroParamedicUserId);
+        var paramedicFilter = IncidentRoleQueries.ForParamedic(
+            db.Incidents.AsNoTracking(),
+            LoadTestIds.MetroAgencyId,
+            LoadTestIds.MetroParamedicUserId);
 
         var hospitalPage = Page(hospitalFilter.Include(i => i.Agency).Include(i => i.DestinationHospital), 1, pageSize);
         var hospitalDeep = Page(hospitalFilter.Include(i => i.Agency).Include(i => i.DestinationHospital), deepPage, maxPageSize);
         var paramedicPage = Page(paramedicFilter.Include(i => i.Agency).Include(i => i.DestinationHospital), 1, pageSize);
-
-        var agencyOnly = db.Incidents.AsNoTracking().Where(i => i.AgencyId == LoadTestIds.MetroAgencyId);
-        var createdOnly = db.Incidents.AsNoTracking().Where(i => i.CreatedByUserId == LoadTestIds.MetroParamedicUserId);
-        var unionPage = Page(
-            agencyOnly.Union(createdOnly).Include(i => i.Agency).Include(i => i.DestinationHospital),
-            1,
-            pageSize);
 
         var detailId = db.Incidents
             .AsNoTracking()
@@ -146,9 +140,8 @@ public static class LoadTestPlanCapture
             new("a-hospital-page", "Hospital staff list page 1 with Agency/Hospital includes.", hospitalPage.ToQueryString()),
             new("a-hospital-count", "Hospital staff CountAsync over the filtered set.", CountSql(hospitalFilter)),
             new("a-hospital-deep", $"Hospital staff deep page {deepPage} at pageSize {maxPageSize} ({hospitalMatchCount} matches).", hospitalDeep.ToQueryString()),
-            new("b-paramedic-or-page", "Paramedic list OR predicate, page 1 with includes.", paramedicPage.ToQueryString()),
-            new("b-paramedic-or-count", "Paramedic CountAsync over the OR filter.", CountSql(paramedicFilter)),
-            new("b-paramedic-union-page", "Paramedic list as UNION of two equality predicates (scoping-equivalent experiment).", SafeToSql(unionPage)),
+            new("b-paramedic-page", "Paramedic list UNION of agency and created-by, page 1 with includes.", paramedicPage.ToQueryString()),
+            new("b-paramedic-count", "Paramedic CountAsync over the UNION filter.", CountSql(paramedicFilter)),
             new("c-detail", "Detail load by Id with vitals/interventions/audits includes.", detail.ToQueryString()),
             new("d-vitals-by-incident", "VitalSigns lookup by IncidentId.", vitalsByIncident.ToQueryString()),
             new("d-audits-by-incident", "AuditEvents lookup by IncidentId.", auditsByIncident.ToQueryString())
@@ -165,28 +158,16 @@ public static class LoadTestPlanCapture
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
 
-    private static string CountSql(IQueryable query)
+    private static string CountSql(IQueryable<Core.Entities.Incident> query)
     {
-        var sql = query.ToQueryString();
-        var from = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
-        if (from < 0)
+        var sql = query.Select(i => i.Id).ToQueryString();
+        var select = sql.IndexOf("SELECT", StringComparison.OrdinalIgnoreCase);
+        if (select < 0)
         {
             return sql;
         }
 
-        return "SELECT COUNT(*) " + sql[from..];
-    }
-
-    private static string SafeToSql(IQueryable query)
-    {
-        try
-        {
-            return query.ToQueryString();
-        }
-        catch (Exception ex)
-        {
-            return "-- ToQueryString failed: " + ex.Message;
-        }
+        return sql[..select] + "SELECT COUNT(*) FROM (" + sql[select..] + ") AS [count_src]";
     }
 
     private static async Task<PlanSnapshot> ExecuteWithPlanAsync(

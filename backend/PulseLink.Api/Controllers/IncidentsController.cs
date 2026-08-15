@@ -422,7 +422,7 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
 
         var agencyId = CurrentAgencyId();
         var userId = CurrentUserId();
-        return query.Where(i => i.AgencyId == agencyId || i.CreatedByUserId == userId);
+        return IncidentRoleQueries.ForParamedic(query, agencyId, userId);
     }
 
     private bool CanAccess(Incident incident)

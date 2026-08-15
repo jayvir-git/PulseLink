@@ -39,8 +39,7 @@ Skew: one metro agency ~54% of rows, one metro hospital the plurality of destina
 | **a** | Hospital staff list | `DestinationHospitalId = @hospital AND Status IN (3, 4, 5)` then order/page, plus `Include` Agency and Hospital |
 | **a count** | Same filter, `COUNT(*)` | Runs on every list request |
 | **a deep** | Same list at page 150, `pageSize` 100 (`OFFSET 14900`) | Same filter |
-| **b** | Paramedic list | `AgencyId = @agency OR CreatedByUserId = @user` then order/page |
-| **b UNION** | Experiment only | `AgencyId` union `CreatedByUserId`, then the same order/page. Not wired into `List()` |
+| **b** | Paramedic list | `AgencyId = @agency` **UNION** `CreatedByUserId = @user` (distinct), then order/page |
 | **c** | Detail by `Id` | PK plus child collections |
 | **d** | Vitals / audits by `IncidentId` | Existing FK indexes |
 
@@ -80,15 +79,18 @@ Page 1 Includes are PK seeks on Agency and Hospital (50 rows). They are not the 
 
 ### b — paramedic list
 
-| Query | Before | After | Sort gone? |
+`List()` now uses `IncidentRoleQueries.ForParamedic`: `Union` of the two equality predicates (SQL `UNION`, not `UNION ALL`). Own-agency creates match both arms; distinct keeps them once.
+
+| Query | After indexes, still OR | After UNION rewrite | Sort gone? |
 | --- | --- | --- | --- |
-| OR page 1 + Includes | Clustered scan **39,204** / **3,006** reads, **Sort**, 154 MB grant, **135 ms** | **Unchanged:** clustered scan 39,204 / 3,006, **Sort** still present, **133 ms** | **No** |
-| OR `CountAsync` | Clustered scan 39,204 / 3,006, **43 ms** | Index union: Agency seek 38,854 (225 reads) + CreatedBy seek 5,207 (54 reads), Hash Match distinct, **58 ms** | n/a |
-| UNION page 1 (experiment) | Two clustered scans + two Sorts, 191 MB grant, **187 ms** | Ordered seeks (49 + 7 keys), merge, **no Sort**, **27 ms**, 0 grant | **Yes** |
+| Page 1 + Includes | Clustered scan **39,204** / **3,006** reads, **Sort**, 154 MB grant, **133 ms** | **Index seek** `IX_Incidents_Agency_UpdatedAtUtc` 50 keys / 3 reads + **index seek** `IX_Incidents_CreatedBy_UpdatedAtUtc` 7 keys / 3 reads, merge, **no Sort**, **32 ms**, 0 grant | **Yes** |
+| `CountAsync` | Index union: Agency seek 38,854 (225 reads) + CreatedBy seek 5,207 (54 reads), Hash Match distinct, **58 ms** | Two clustered scans (38,854 + 5,207, 3,006+3,006 reads), merge distinct, **79 ms** | n/a |
 
-The current `List()` predicate is still `AgencyId OR CreatedByUserId`. With the new indexes the optimizer does not seek+merge that OR together with `ORDER BY` + `TOP`; it still scans and sorts. UNION of the two equality predicates *does* use both composites and the Sort disappears (27 ms vs 133 ms). That is a scoping-sensitive rewrite of `ApplyRoleFilter`, not an index-only change. Recommend it as a follow-up; it is not applied here.
+Both list-access indexes are used on the page query. The `PK_Hospitals` scan in that plan is the 10-row hospital table (nested-loop prefetch), not Incidents. Indexes stay.
 
-OR count after indexes is seek-based but slightly slower than the scan (58 vs 43 ms) because it concatenates ~44k keys and hashes distinct. It is still cheaper than the OR page query (133 ms).
+`CountAsync` on the UNION is slower than the OR count (79 vs 58 ms) because EF unions the full incident row before counting. Combined list request is still faster: **111 ms** (79+32) vs **191 ms** (58+133). Envelope unchanged.
+
+Before either index existed, OR page was 135 ms and OR count 43 ms.
 
 ### c / d — detail and children
 
@@ -96,9 +98,8 @@ PK seek on Incidents plus `IX_VitalSigns_IncidentId` / `IX_Interventions_Inciden
 
 ## What we did not change
 
-- Role filters and `IncidentStatusMachine` are unchanged.
+- Hospital list filter, `CanAccess` (single-row), and `IncidentStatusMachine` are unchanged.
 - Pagination envelope `{ items, page, pageSize, totalCount }` is unchanged.
-- Paramedic `OR` is unchanged despite the UNION evidence.
 - No keyset pagination.
 
 ## How to re-measure
