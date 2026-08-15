@@ -43,7 +43,17 @@ Vite proxies `/api` to the API during local development.
 
 ### SQL Server (optional)
 
-SQLite is the default. To run against SQL Server instead:
+SQLite is the default. SQL Server is a second EF provider (`Database:Provider=SqlServer`) with its own migration set.
+
+On Windows without Docker, LocalDB is the verified path:
+
+```bash
+sqllocaldb start MSSQLLocalDB
+cd backend/PulseLink.Api
+dotnet run --launch-profile http-localdb
+```
+
+Where Docker is available:
 
 ```bash
 docker compose up -d
@@ -51,15 +61,15 @@ cd backend/PulseLink.Api
 dotnet run --launch-profile http-sqlserver
 ```
 
-On Windows without Docker, use LocalDB (`dotnet run --launch-profile http-localdb`).
-
-Migration commands, provider settings, and how production should apply schema changes: [docs/database.md](docs/database.md).
+`docker-compose.yml` is documented; it has not been run as part of the LocalDB verification. Provider settings, both `--context` migration commands, and startup-vs-deploy migrate: [docs/database.md](docs/database.md). List indexes: [docs/performance.md](docs/performance.md).
 
 ### Tests
 
 ```bash
 dotnet test PulseLink.sln
 ```
+
+List ordering is also run against SQL Server LocalDB when it is present. Those facts skip in CI (Ubuntu has no LocalDB).
 
 ## Seeded local users
 
@@ -97,7 +107,7 @@ PulseLink/
     PulseLink.Api/             HTTP + JWT + controllers
     PulseLink.Core/            Entities + status machine
     PulseLink.Infrastructure/  EF Core, Identity, seed data
-    PulseLink.Tests/           Domain tests
+    PulseLink.Tests/           Domain, data, and API tests
   frontend/                    React + TypeScript UI
   docs/                        Architecture, walkthrough, database, performance
 ```

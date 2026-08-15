@@ -75,8 +75,6 @@ Page 1 Includes are PK seeks on Agency and Hospital (50 rows). They are not the 
 
 **Count vs page (large hospital tenant):** count is cheaper both before (38 vs 94 ms) and after (11 vs 34 ms). Same access path I/O before indexes (both scanned 3,006 pages). After indexes, count still costs less than the page query. Options if list latency later needs another cut (not implemented): skip `totalCount` after page 1, cache it per tenant, or return `hasMore` instead of an exact total. Do not change the envelope without a measured need — count is not the larger of the two queries here.
 
-**Deep OFFSET:** removing Sort is not enough. Page 1 does 50 key lookups; page 150 does 15,000. I/O is *higher* than the pre-index scan. `Id` is already the stable tie-breaker, so keyset (`WHERE (UpdatedAtUtc, Id) < (@lastUtc, @lastId) ORDER BY … FETCH`) is available. Hospital UI is page 1. Keep `OFFSET` until a product path pages this deep.
-
 ### b — paramedic list
 
 `List()` now uses `IncidentRoleQueries.ForParamedic`: `Union` of the two equality predicates (SQL `UNION`, not `UNION ALL`). Own-agency creates match both arms; distinct keeps them once.
@@ -96,11 +94,19 @@ Before either index existed, OR page was 135 ms and OR count 43 ms.
 
 PK seek on Incidents plus `IX_VitalSigns_IncidentId` / `IX_Interventions_IncidentId` / `IX_AuditEvents_IncidentId`. No new indexes. Plans unchanged (~5–36 ms).
 
+## Deep OFFSET
+
+Removing Sort is not enough. Page 1 does 50 key lookups; page 150 does 15,000. Logical reads went **up**: **43,108** at `OFFSET 14900` versus **3,006** for the pre-index clustered scan. Latency was unchanged (88 ms vs 89 ms). `Id` is already the stable tie-breaker, so keyset (`WHERE (UpdatedAtUtc, Id) < (@lastUtc, @lastId) ORDER BY … FETCH`) is available. Hospital UI is page 1. Keep `OFFSET` until a product path pages this deep.
+
 ## What we did not change
 
-- Hospital list filter, `CanAccess` (single-row), and `IncidentStatusMachine` are unchanged.
-- Pagination envelope `{ items, page, pageSize, totalCount }` is unchanged.
-- No keyset pagination.
+Rejected, with the measurement that decided it:
+
+- **Exact `totalCount` on every list request.** After the hospital index, count is cheaper than the page query (11 vs 34 ms). After the paramedic UNION, count is slower than the page (79 vs 32 ms) but the combined request is still faster than the OR list (111 vs 191 ms). Options (count only on page 1, cache, or `hasMore`) stay on the table; the envelope `{ items, page, pageSize, totalCount }` did not change.
+- **Keyset pagination.** `Id` is already the tie-breaker, so it is available. Deep OFFSET logical reads went up (see [Deep OFFSET](#deep-offset)). Hospital UI is page 1, so `OFFSET`/`FETCH` stays.
+- **Dropping `IX_Incidents_Agency_UpdatedAtUtc` / `IX_Incidents_CreatedBy_UpdatedAtUtc`.** They were unused (and a net regression) while the paramedic predicate was `OR`. The UNION rewrite seeks both on the page query, so they stay.
+- **`UNION ALL`.** Own-agency creates match both arms; `UNION ALL` would duplicate rows and inflate `totalCount`.
+- Hospital list filter, single-row `CanAccess`, and `IncidentStatusMachine`.
 
 ## How to re-measure
 

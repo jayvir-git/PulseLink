@@ -51,7 +51,9 @@ cd backend/PulseLink.Api && dotnet run --launch-profile http-localdb
 cd frontend && npm run dev
 ```
 
-Migrations: SQLite is the default set (`SqlitePulseLinkDbContext`, `Data/Migrations/Sqlite`). SQL Server is a separate set (`SqlServerPulseLinkDbContext`, `Data/Migrations/SqlServer`). Commands and startup-vs-deploy migrate behavior: [docs/database.md](docs/database.md). List indexes and measured plans: [docs/performance.md](docs/performance.md).
+Migrations: SQLite is the default set (`SqlitePulseLinkDbContext`, `Data/Migrations/Sqlite`). SQL Server is a separate set (`SqlServerPulseLinkDbContext`, `Data/Migrations/SqlServer`). Always pass `--context` and `--output-dir`. Commands and startup-vs-deploy migrate behavior: [docs/database.md](docs/database.md). List indexes and measured plans: [docs/performance.md](docs/performance.md).
+
+CI (`.github/workflows/ci.yml`) runs `dotnet test PulseLink.sln` and `npm run build` in `frontend`. Tests use SQLite. SQL Server ordering facts require LocalDB and skip when it is not there.
 
 ## Engineering guardrails
 
