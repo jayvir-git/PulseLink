@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PulseLink.Infrastructure.Data;
 
@@ -10,9 +11,11 @@ using PulseLink.Infrastructure.Data;
 namespace PulseLink.Infrastructure.Data.Migrations.Sqlite
 {
     [DbContext(typeof(SqlitePulseLinkDbContext))]
-    partial class SqlitePulseLinkDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916022137_AddIncidentVersion")]
+    partial class AddIncidentVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -342,52 +345,6 @@ namespace PulseLink.Infrastructure.Data.Migrations.Sqlite
                     b.ToTable("Interventions");
                 });
 
-            modelBuilder.Entity("PulseLink.Core.Entities.InterventionOperation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ActorUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CompletedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Fingerprint")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("IncidentId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("InterventionId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("Key")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTimeOffset>("PerformedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IncidentId");
-
-                    b.HasIndex("InterventionId");
-
-                    b.HasIndex("ActorUserId", "IncidentId", "Key")
-                        .IsUnique();
-
-                    b.ToTable("InterventionOperations");
-                });
-
             modelBuilder.Entity("PulseLink.Core.Entities.VitalSign", b =>
                 {
                     b.Property<Guid>("Id")
@@ -594,21 +551,6 @@ namespace PulseLink.Infrastructure.Data.Migrations.Sqlite
                         .IsRequired();
 
                     b.Navigation("Incident");
-                });
-
-            modelBuilder.Entity("PulseLink.Core.Entities.InterventionOperation", b =>
-                {
-                    b.HasOne("PulseLink.Core.Entities.Incident", null)
-                        .WithMany()
-                        .HasForeignKey("IncidentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PulseLink.Core.Entities.Intervention", null)
-                        .WithMany()
-                        .HasForeignKey("InterventionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("PulseLink.Core.Entities.VitalSign", b =>

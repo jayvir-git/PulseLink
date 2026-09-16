@@ -16,6 +16,7 @@ public class PulseLinkDbContext : IdentityDbContext<AppUser>
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<VitalSign> VitalSigns => Set<VitalSign>();
     public DbSet<Intervention> Interventions => Set<Intervention>();
+    public DbSet<InterventionOperation> InterventionOperations => Set<InterventionOperation>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -39,6 +40,7 @@ public class PulseLinkDbContext : IdentityDbContext<AppUser>
         builder.Entity<Incident>(e =>
         {
             e.HasKey(x => x.Id);
+            e.Property(x => x.Version).IsConcurrencyToken();
             e.HasIndex(x => x.IncidentNumber).IsUnique();
             e.Property(x => x.IncidentNumber).HasMaxLength(40).IsRequired();
             e.Property(x => x.ChiefComplaint).HasMaxLength(500).IsRequired();
@@ -84,6 +86,16 @@ public class PulseLinkDbContext : IdentityDbContext<AppUser>
             e.HasOne(x => x.Incident).WithMany(i => i.Interventions).HasForeignKey(x => x.IncidentId);
         });
 
+        builder.Entity<InterventionOperation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ActorUserId).HasMaxLength(450).IsRequired();
+            e.Property(x => x.Fingerprint).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => new { x.ActorUserId, x.IncidentId, x.Key }).IsUnique();
+            e.HasOne<Incident>().WithMany().HasForeignKey(x => x.IncidentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Intervention>().WithMany().HasForeignKey(x => x.InterventionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<AuditEvent>(e =>
         {
             e.HasKey(x => x.Id);
@@ -100,25 +112,31 @@ public class PulseLinkDbContext : IdentityDbContext<AppUser>
         });
     }
 
-    public override int SaveChanges()
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        SyncIncidentUpdatedAtUtc();
-        return base.SaveChanges();
+        PrepareIncidentWrites();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        SyncIncidentUpdatedAtUtc();
-        return base.SaveChangesAsync(cancellationToken);
+        PrepareIncidentWrites();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    private void SyncIncidentUpdatedAtUtc()
+    private void PrepareIncidentWrites()
     {
         foreach (var entry in ChangeTracker.Entries<Incident>())
         {
             if (entry.State is EntityState.Added or EntityState.Modified)
             {
                 entry.Entity.UpdatedAtUtc = entry.Entity.UpdatedAt.UtcDateTime;
+                // Child append endpoints also update their parent incident. Export
+                // auditing alone does not track a modified incident or change its version.
+                if (entry.State == EntityState.Modified)
+                {
+                    entry.Entity.Version = Guid.NewGuid();
+                }
             }
         }
     }

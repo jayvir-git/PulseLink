@@ -3,14 +3,14 @@ using Microsoft.Data.SqlClient;
 namespace PulseLink.Tests.Infrastructure;
 
 /// <summary>
-/// Runs only when SQL Server LocalDB answers. CI (Ubuntu) skips these facts.
+/// Optional locally; required in the SQL Server CI job even if the server is unavailable.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public sealed class LocalDbFactAttribute : FactAttribute
 {
     public LocalDbFactAttribute()
     {
-        if (!LocalDb.IsAvailable)
+        if (LocalDb.ShouldSkip(LocalDb.Required, LocalDb.IsAvailable))
         {
             Skip = "SQL Server LocalDB is not available.";
         }
@@ -20,6 +20,8 @@ public sealed class LocalDbFactAttribute : FactAttribute
 public static class LocalDb
 {
     public const string Server = @"(localdb)\MSSQLLocalDB";
+    public static bool Required => Environment.GetEnvironmentVariable("PULSELINK_REQUIRE_SQLSERVER") == "1";
+    internal static bool ShouldSkip(bool required, bool available) => !required && !available;
 
     private static readonly Lazy<bool> Available = new(
         () => Detect(OperatingSystem.IsWindows(), ConnectMaster),

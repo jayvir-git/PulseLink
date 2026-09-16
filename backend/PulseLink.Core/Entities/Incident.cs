@@ -5,6 +5,7 @@ namespace PulseLink.Core.Entities;
 public class Incident
 {
     public Guid Id { get; set; }
+    public Guid Version { get; set; } = Guid.NewGuid();
     public string IncidentNumber { get; set; } = string.Empty;
     public IncidentStatus Status { get; set; } = IncidentStatus.Draft;
 

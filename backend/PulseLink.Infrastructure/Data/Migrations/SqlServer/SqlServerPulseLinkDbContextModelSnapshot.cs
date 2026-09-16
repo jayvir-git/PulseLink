@@ -285,6 +285,10 @@ namespace PulseLink.Infrastructure.Data.Migrations.SqlServer
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DestinationHospitalId");
@@ -346,6 +350,52 @@ namespace PulseLink.Infrastructure.Data.Migrations.SqlServer
                     b.HasIndex("IncidentId");
 
                     b.ToTable("Interventions");
+                });
+
+            modelBuilder.Entity("PulseLink.Core.Entities.InterventionOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InterventionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Key")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("PerformedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncidentId");
+
+                    b.HasIndex("InterventionId");
+
+                    b.HasIndex("ActorUserId", "IncidentId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("InterventionOperations");
                 });
 
             modelBuilder.Entity("PulseLink.Core.Entities.VitalSign", b =>
@@ -555,6 +605,21 @@ namespace PulseLink.Infrastructure.Data.Migrations.SqlServer
                         .IsRequired();
 
                     b.Navigation("Incident");
+                });
+
+            modelBuilder.Entity("PulseLink.Core.Entities.InterventionOperation", b =>
+                {
+                    b.HasOne("PulseLink.Core.Entities.Incident", null)
+                        .WithMany()
+                        .HasForeignKey("IncidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PulseLink.Core.Entities.Intervention", null)
+                        .WithMany()
+                        .HasForeignKey("InterventionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("PulseLink.Core.Entities.VitalSign", b =>

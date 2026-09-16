@@ -54,7 +54,7 @@ public static class LoadTestIds
 
 /// <summary>
 /// Opt-in large, skewed incident set for index/plan measurement. Not used by the demo seed.
-/// Inserts bypass SaveChanges (bulk copy / batched SQL), so UpdatedAtUtc is set on every row.
+/// Inserts bypass SaveChanges, so UpdatedAtUtc and Version are included on every row.
 /// </summary>
 public static class LoadTestSeeder
 {
@@ -233,6 +233,7 @@ public static class LoadTestSeeder
         {
             await db.Database.ExecuteSqlRawAsync(
                 """
+                DELETE FROM InterventionOperations WHERE IncidentId IN (SELECT Id FROM Incidents WHERE IncidentNumber LIKE 'LT-%');
                 DELETE FROM VitalSigns WHERE IncidentId IN (SELECT Id FROM Incidents WHERE IncidentNumber LIKE 'LT-%');
                 DELETE FROM Interventions WHERE IncidentId IN (SELECT Id FROM Incidents WHERE IncidentNumber LIKE 'LT-%');
                 DELETE FROM AuditEvents WHERE Details = 'Load-test seed';
@@ -246,6 +247,7 @@ public static class LoadTestSeeder
 
         await db.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM InterventionOperations WHERE IncidentId IN (SELECT Id FROM Incidents WHERE IncidentNumber LIKE 'LT-%');
             DELETE FROM VitalSigns WHERE IncidentId IN (SELECT Id FROM Incidents WHERE IncidentNumber LIKE 'LT-%');
             DELETE FROM Interventions WHERE IncidentId IN (SELECT Id FROM Incidents WHERE IncidentNumber LIKE 'LT-%');
             DELETE FROM AuditEvents WHERE Details = 'Load-test seed';
@@ -585,6 +587,7 @@ public static class LoadTestSeeder
     {
         var table = new DataTable();
         table.Columns.Add("Id", typeof(Guid));
+        table.Columns.Add("Version", typeof(Guid));
         table.Columns.Add("IncidentNumber", typeof(string));
         table.Columns.Add("Status", typeof(int));
         table.Columns.Add("AgencyId", typeof(Guid));
@@ -602,6 +605,7 @@ public static class LoadTestSeeder
         {
             table.Rows.Add(
                 i.Id,
+                i.Version,
                 i.IncidentNumber,
                 (int)i.Status,
                 i.AgencyId,
@@ -661,13 +665,14 @@ public static class LoadTestSeeder
         cmd.CommandText =
             """
             INSERT INTO Incidents
-            (Id, IncidentNumber, Status, AgencyId, DestinationHospitalId, CreatedByUserId,
+            (Id, Version, IncidentNumber, Status, AgencyId, DestinationHospitalId, CreatedByUserId,
              PatientAgeRange, PatientSex, ChiefComplaint, Notes, CreatedAt, UpdatedAt, UpdatedAtUtc, HandedOffAt)
             VALUES
-            ($Id, $IncidentNumber, $Status, $AgencyId, $DestinationHospitalId, $CreatedByUserId,
+            ($Id, $Version, $IncidentNumber, $Status, $AgencyId, $DestinationHospitalId, $CreatedByUserId,
              $PatientAgeRange, $PatientSex, $ChiefComplaint, $Notes, $CreatedAt, $UpdatedAt, $UpdatedAtUtc, $HandedOffAt)
             """;
         var pId = cmd.CreateParameter(); pId.ParameterName = "$Id"; cmd.Parameters.Add(pId);
+        var pVersion = cmd.CreateParameter(); pVersion.ParameterName = "$Version"; cmd.Parameters.Add(pVersion);
         var pNum = cmd.CreateParameter(); pNum.ParameterName = "$IncidentNumber"; cmd.Parameters.Add(pNum);
         var pStatus = cmd.CreateParameter(); pStatus.ParameterName = "$Status"; cmd.Parameters.Add(pStatus);
         var pAgency = cmd.CreateParameter(); pAgency.ParameterName = "$AgencyId"; cmd.Parameters.Add(pAgency);
@@ -685,6 +690,7 @@ public static class LoadTestSeeder
         foreach (var i in rows)
         {
             pId.Value = GuidText(i.Id);
+            pVersion.Value = GuidText(i.Version);
             pNum.Value = i.IncidentNumber;
             pStatus.Value = (int)i.Status;
             pAgency.Value = GuidText(i.AgencyId);

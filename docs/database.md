@@ -95,6 +95,24 @@ dotnet ef database update --context SqlServerPulseLinkDbContext --project backen
 
 ## Startup migrate vs deploy-time migrate
 
+`AddIncidentVersion` adds an application-managed GUID concurrency token in both
+migration sets and initializes existing incidents with independent values. Apply
+the matching migration before deploying the version-aware API. Its update, status,
+vital, and intervention endpoints require the `If-Match` contract described in
+[architecture.md](architecture.md#incident-write-versions); older clients receive
+428 until they send the loaded incident version. Migration upgrades were exercised
+on disposable SQLite and SQL Server LocalDB data, not on the application database.
+
+`AddInterventionOperations` adds the persistent intervention retry records in both
+providers. A unique `(ActorUserId, IncidentId, Key)` index enforces request identity;
+restricting foreign keys link each record to its incident and intervention. Apply
+this migration before deploying the retry-aware API and update clients to send
+`Idempotency-Key`. Successful intervention responses now contain a stable operation
+result rather than incident detail. Records expire for replay after 24 hours but
+remain stored to reject expired-key reuse; no automatic pruning is implemented.
+The synthetic load-test reset deletes these dependent records before interventions.
+These migrations were exercised only in disposable test databases.
+
 In Development, the API still calls `Database.MigrateAsync()` during seed so a deleted `pulselink.db` (or a fresh Docker database) comes up on `dotnet run`. That is the local developer path.
 
 It is not used as the production default. Concurrent app instances can race on the history table, and schema changes then run with the application's database credentials on every process start.
