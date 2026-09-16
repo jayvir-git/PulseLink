@@ -6,7 +6,7 @@ export function NewIncidentPage() {
   const navigate = useNavigate();
   const [hospitals, setHospitals] = useState<{ id: string; name: string; city: string }[]>([]);
   const [chiefComplaint, setChiefComplaint] = useState('');
-  const [patientAgeRange, setPatientAgeRange] = useState('40-49');
+  const [patientAgeRange, setPatientAgeRange] = useState('');
   const [patientSex, setPatientSex] = useState('Unknown');
   const [destinationHospitalId, setDestinationHospitalId] = useState('');
   const [notes, setNotes] = useState('');
@@ -17,7 +17,7 @@ export function NewIncidentPage() {
     api.hospitals().then((list) => {
       setHospitals(list);
       if (list[0]) setDestinationHospitalId(list[0].id);
-    });
+    }).catch(err => setError(err instanceof Error ? err.message : 'Could not load hospitals'));
   }, []);
 
   async function onSubmit(e: FormEvent) {

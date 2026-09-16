@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -32,6 +34,15 @@ public static class DbSeeder
                 "Skipping database migrate at startup. Apply migrations as a deploy step, or set Database:MigrateOnStartup=true.");
         }
 
+        if (db.Database.IsSqlServer())
+        {
+            // Azure SQL serverless may reject the first connection while resuming.
+            // Retry only opening the connection, before any seed writes occur.
+            var startupConnection = new SqlServerRetryingExecutionStrategy(db, 6, TimeSpan.FromSeconds(30), null);
+            var connection = db.GetService<IRelationalConnection>();
+            await startupConnection.ExecuteAsync(() => connection.OpenAsync(CancellationToken.None));
+        }
+
         foreach (var role in AppRoles.All)
         {
             if (!await roleManager.RoleExistsAsync(role))
@@ -43,6 +54,14 @@ public static class DbSeeder
         if (await db.Agencies.AnyAsync())
         {
             return;
+        }
+
+        var password = configuration["Demo:Password"];
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            if (!environment.IsDevelopment())
+                throw new InvalidOperationException("Set Demo:Password before initializing hosted demo accounts.");
+            password = "Demo123!";
         }
 
         var agency = new Agency
@@ -70,9 +89,9 @@ public static class DbSeeder
         db.Hospitals.AddRange(hospital, hospital2);
         await db.SaveChangesAsync();
 
-        await CreateUserAsync(userManager, "paramedic@pulselink.demo", "Paramedic Demo", "Demo123!", AppRoles.Paramedic, agency.Id, null);
-        await CreateUserAsync(userManager, "hospital@pulselink.demo", "Hospital Demo", "Demo123!", AppRoles.HospitalStaff, null, hospital.Id);
-        await CreateUserAsync(userManager, "admin@pulselink.demo", "Admin Demo", "Demo123!", AppRoles.Admin, null, null);
+        await CreateUserAsync(userManager, "paramedic@pulselink.demo", "Paramedic Demo", password, AppRoles.Paramedic, agency.Id, null);
+        await CreateUserAsync(userManager, "hospital@pulselink.demo", "Hospital Demo", password, AppRoles.HospitalStaff, null, hospital.Id);
+        await CreateUserAsync(userManager, "admin@pulselink.demo", "Admin Demo", password, AppRoles.Admin, null, null);
     }
 
     private static async Task CreateUserAsync(

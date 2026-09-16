@@ -3,6 +3,9 @@ import { Link, useParams } from 'react-router-dom';
 import { api, ApiError, type IncidentDetail } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
+const vitalLabels: Record<string, string> = { heartRate: 'Heart rate (bpm)', systolicBp: 'Systolic BP (mmHg)', diastolicBp: 'Diastolic BP (mmHg)', respiratoryRate: 'Respiratory rate (/min)', spO2: 'Oxygen saturation (%)', temperatureC: 'Temperature (°C)', glasgowComaScale: 'Glasgow Coma Scale' };
+const interventionLabels: Record<string, string> = { name: 'Intervention name', medication: 'Medication', dose: 'Dose', route: 'Route', notes: 'Intervention notes' };
+
 type InterventionAttempt = { key: string; version: string; body: Record<string, string> };
 
 export function IncidentDetailPage() {
@@ -23,19 +26,19 @@ function IncidentDetailContent({ id }: { id: string }) {
   const [interventionAttempt, setInterventionAttempt] = useState<InterventionAttempt | null>(null);
   const [exportJson, setExportJson] = useState('');
   const [vitalForm, setVitalForm] = useState({
-    heartRate: '88',
-    systolicBp: '142',
-    diastolicBp: '90',
-    respiratoryRate: '18',
-    spO2: '96',
-    temperatureC: '37.0',
-    glasgowComaScale: '15',
+    heartRate: '',
+    systolicBp: '',
+    diastolicBp: '',
+    respiratoryRate: '',
+    spO2: '',
+    temperatureC: '',
+    glasgowComaScale: '',
   });
   const [interventionForm, setInterventionForm] = useState({
-    name: 'Aspirin',
-    medication: 'Aspirin',
-    dose: '324 mg',
-    route: 'PO',
+    name: '',
+    medication: '',
+    dose: '',
+    route: '',
     notes: '',
   });
 
@@ -98,18 +101,22 @@ function IncidentDetailContent({ id }: { id: string }) {
   async function onAddVital(e: FormEvent) {
     e.preventDefault();
     if (!id || !incident || pending || conflict || interventionAttempt || !canEdit) return;
+    if (!Object.values(vitalForm).some(value => value.trim())) {
+      setError('Enter at least one observation before adding vitals.');
+      return;
+    }
     setPending(true);
     setError('');
     setNotice('');
     try {
       setIncident(
         await api.addVital(id, {
-          heartRate: Number(vitalForm.heartRate) || null,
-          systolicBp: Number(vitalForm.systolicBp) || null,
-          diastolicBp: Number(vitalForm.diastolicBp) || null,
-          respiratoryRate: Number(vitalForm.respiratoryRate) || null,
-          spO2: Number(vitalForm.spO2) || null,
-          temperatureC: Number(vitalForm.temperatureC) || null,
+          heartRate: vitalForm.heartRate.trim() === '' ? null : Number(vitalForm.heartRate),
+          systolicBp: vitalForm.systolicBp.trim() === '' ? null : Number(vitalForm.systolicBp),
+          diastolicBp: vitalForm.diastolicBp.trim() === '' ? null : Number(vitalForm.diastolicBp),
+          respiratoryRate: vitalForm.respiratoryRate.trim() === '' ? null : Number(vitalForm.respiratoryRate),
+          spO2: vitalForm.spO2.trim() === '' ? null : Number(vitalForm.spO2),
+          temperatureC: vitalForm.temperatureC.trim() === '' ? null : Number(vitalForm.temperatureC),
           glasgowComaScale: vitalForm.glasgowComaScale,
         }, incident.version),
       );
@@ -258,13 +265,14 @@ function IncidentDetailContent({ id }: { id: string }) {
 
         <div className="panel">
           <h2>Vitals</h2>
+          {canEdit && <p className="form-hint">Enter measured observations. Leave unrecorded values blank.</p>}
           <ul className="list">
             {incident.vitalSigns.map((v) => (
               <li key={v.id}>
                 <strong>{new Date(v.recordedAt).toLocaleString()}</strong>
                 <span>
                   HR {v.heartRate ?? '—'} · BP {v.systolicBp ?? '—'}/{v.diastolicBp ?? '—'} · RR{' '}
-                  {v.respiratoryRate ?? '—'} · SpO2 {v.spO2 ?? '—'}% · GCS {v.glasgowComaScale ?? '—'}
+                  {v.respiratoryRate ?? '—'}/min · SpO₂ {v.spO2 ?? '—'}% · Temp {v.temperatureC ?? '—'}°C · GCS {v.glasgowComaScale ?? '—'}
                 </span>
               </li>
             ))}
@@ -276,8 +284,10 @@ function IncidentDetailContent({ id }: { id: string }) {
                 <div className="grid-3">
                   {Object.entries(vitalForm).map(([key, value]) => (
                     <label key={key}>
-                      {key}
+                      {vitalLabels[key]}
                       <input
+                        type="number"
+                        step={key === 'temperatureC' ? '0.1' : '1'}
                         value={value}
                         onChange={(e) => setVitalForm((prev) => ({ ...prev, [key]: e.target.value }))}
                       />
@@ -292,6 +302,7 @@ function IncidentDetailContent({ id }: { id: string }) {
 
         <div className="panel">
           <h2>Interventions</h2>
+          {canEdit && <p className="form-hint">Record the action taken. Medication details are optional.</p>}
           <ul className="list">
             {incident.interventions.map((i) => (
               <li key={i.id}>
@@ -309,8 +320,9 @@ function IncidentDetailContent({ id }: { id: string }) {
                 <div className="grid-2">
                   {Object.entries(interventionForm).map(([key, value]) => (
                     <label key={key}>
-                      {key}
+                      {interventionLabels[key]}
                       <input
+                        required={key === 'name'}
                         value={value}
                         onChange={(e) =>
                           setInterventionForm((prev) => ({ ...prev, [key]: e.target.value }))
