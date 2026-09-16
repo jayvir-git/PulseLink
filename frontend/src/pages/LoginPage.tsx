@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 const demos = [
@@ -33,15 +33,16 @@ export function LoginPage() {
   return (
     <div className="login-shell">
       <div className="login-panel">
-        <p className="eyebrow">PulseLink</p>
-        <h1>EMS to hospital handoff</h1>
+        <Link className="login-back" to="/">← PulseLink home</Link>
+        <p className="eyebrow">YOUR CARE WORKSPACE</p>
+        <h1>Welcome back.</h1>
         <p className="lede">
           Sign in to create field PCRs, advance transport status, and deliver structured hospital handoffs.
         </p>
         <form onSubmit={onSubmit} className="stack">
           <label>
             Email
-            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="username" required />
           </label>
           <label>
             Password
@@ -49,6 +50,7 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
+              autoComplete="current-password"
               required
             />
           </label>

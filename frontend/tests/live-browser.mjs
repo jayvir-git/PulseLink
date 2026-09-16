@@ -49,7 +49,7 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
     const b = await context.newPage();
     a.setDefaultTimeout(10000);
     b.setDefaultTimeout(10000);
-    await a.goto(origin);
+    await a.goto(`${origin}/login`);
     await a.getByLabel('Email', { exact: true }).fill('paramedic@pulselink.demo');
     await a.getByLabel('Password', { exact: true }).fill('Demo123!');
     await a.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -58,13 +58,14 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
       await page.goto(`${origin}/incidents/${incident.id}`);
       await page.getByRole('heading', { name: 'Synthetic two-tab walkthrough' }).waitFor();
     }
-    await b.getByLabel('heartRate', { exact: true }).fill('99');
+    await b.getByLabel('Heart rate (bpm)', { exact: true }).fill('99');
+    await a.getByLabel('Heart rate (bpm)', { exact: true }).fill('80');
     const saved = a.waitForResponse(r => r.url().endsWith('/vitals') && r.request().method() === 'POST');
     await a.getByRole('button', { name: 'Add vitals', exact: true }).click();
     assert.equal((await saved).status(), 200);
     await b.getByRole('button', { name: 'Add vitals', exact: true }).click();
     await b.getByRole('button', { name: 'Reload latest incident' }).waitFor();
-    assert.equal(await b.getByLabel('heartRate', { exact: true }).inputValue(), '99');
+    assert.equal(await b.getByLabel('Heart rate (bpm)', { exact: true }).inputValue(), '99');
     await b.getByRole('button', { name: 'Reload latest incident' }).click();
     await b.getByRole('status').waitFor();
 
@@ -81,6 +82,7 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
         await route.abort('failed');
       } else await route.continue();
     });
+    await a.getByLabel('Intervention name', { exact: true }).fill('Synthetic observation');
     await a.getByRole('button', { name: 'Add intervention', exact: true }).click();
     await a.getByText('The intervention result is uncertain. Keep this page open and retry the same intervention.', { exact: true }).waitFor();
     await a.getByRole('button', { name: 'Retry same intervention' }).click();
@@ -92,7 +94,7 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
     await b.getByRole('button', { name: 'Add vitals', exact: true }).click();
     await b.getByRole('button', { name: 'Reload latest incident' }).click();
     await b.locator('.status-handedoff').waitFor();
-    assert.equal(await b.getByLabel('heartRate', { exact: true }).inputValue(), '99');
+    assert.equal(await b.getByLabel('Heart rate (bpm)', { exact: true }).inputValue(), '99');
     assert.equal(await b.getByRole('button', { name: 'Add vitals', exact: true }).isDisabled(), true);
     const persisted = await call(path, { token });
     assert.equal(persisted.vitalSigns.length, 1);

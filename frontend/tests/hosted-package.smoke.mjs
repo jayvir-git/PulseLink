@@ -50,6 +50,7 @@ test('Published app serves the SPA and authenticates with hosted credentials', {
     browser = await chromium.launch({ headless: true, executablePath: process.env.PULSELINK_BROWSER_PATH || undefined });
     const page = await browser.newPage();
     await page.goto(origin);
+    await page.getByRole('link', { name: 'Open your workspace' }).click();
     assert.equal(await page.getByLabel('Email', { exact: true }).inputValue(), '');
     assert.equal(await page.getByLabel('Password', { exact: true }).inputValue(), '');
     assert.equal(await page.getByText('Demo accounts (password: Demo123!)').count(), 0);

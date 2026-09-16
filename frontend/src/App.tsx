@@ -5,6 +5,7 @@ import { AdminPage } from './pages/AdminPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { IncidentDetailPage } from './pages/IncidentDetailPage';
 import { LoginPage } from './pages/LoginPage';
+import { LandingPage } from './pages/LandingPage';
 import { NewIncidentPage } from './pages/NewIncidentPage';
 
 function Shell({ children }: { children: ReactNode }) {
@@ -48,15 +49,14 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const { user } = useAuth();
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"
         element={
-          <Protected>
-            <DashboardPage />
-          </Protected>
+          user ? <Protected><DashboardPage /></Protected> : <LandingPage />
         }
       />
       <Route
