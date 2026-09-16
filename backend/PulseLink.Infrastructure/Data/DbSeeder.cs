@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,6 +32,15 @@ public static class DbSeeder
         {
             logger.LogInformation(
                 "Skipping database migrate at startup. Apply migrations as a deploy step, or set Database:MigrateOnStartup=true.");
+        }
+
+        if (db.Database.IsSqlServer())
+        {
+            // Azure SQL serverless may reject the first connection while resuming.
+            // Retry only opening the connection, before any seed writes occur.
+            var startupConnection = new SqlServerRetryingExecutionStrategy(db, 6, TimeSpan.FromSeconds(30), null);
+            var connection = db.GetService<IRelationalConnection>();
+            await startupConnection.ExecuteAsync(() => connection.OpenAsync(CancellationToken.None));
         }
 
         foreach (var role in AppRoles.All)

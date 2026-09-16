@@ -45,3 +45,7 @@ the App Service tier or changing SQL's exhaustion behavior can incur charges.
 After deployment, check `/health`, sign in, create a synthetic incident, and confirm
 the receiving hospital can see it after transport begins. Use synthetic data for
 this demonstration deployment.
+
+### Serverless database startup
+
+Azure SQL serverless can return error 40613 while resuming. Startup opens the SQL connection with a bounded transient retry before seeding roles and demo data. Only connection opening is retried; seed writes and clinical requests are not replayed by this startup policy. The connection is disposed with the seed scope. Database migration remains controlled by `Database:MigrateOnStartup`.

@@ -1,3 +1,5 @@
+using System.Data.Common;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +44,54 @@ public class DemoSeedTests
         fixture.Configuration["Demo:Password"] = null;
         await DbSeeder.SeedAsync(fixture.Services);
         Assert.Equal(3, await manager.Users.CountAsync());
+    }
+
+    [LocalDbFact]
+    public async Task SqlServer_StartupRecoversFromTransientConnectionFailureBeforeSeeding()
+    {
+        var catalog = "PulseLink_Startup_" + Guid.NewGuid().ToString("N");
+        var failure = new FirstOpenFailure();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Database:Provider"] = "SqlServer",
+            ["ConnectionStrings:SqlServer"] = LocalDb.ConnectionString(catalog),
+            ["Demo:Password"] = "Synthetic-Startup-Password-123!"
+        }).Build();
+        await using var services = new ServiceCollection().AddLogging()
+            .AddSingleton<IConfiguration>(configuration)
+            .AddSingleton<IHostEnvironment>(new ProductionEnvironment())
+            .AddInfrastructure(configuration)
+            .AddScoped<SqlServerPulseLinkDbContext>(_ => new SqlServerPulseLinkDbContext(
+                new DbContextOptionsBuilder<SqlServerPulseLinkDbContext>()
+                    .UseSqlServer(LocalDb.ConnectionString(catalog)).AddInterceptors(failure).Options))
+            .BuildServiceProvider();
+        try
+        {
+            using (var scope = services.CreateScope())
+                await scope.ServiceProvider.GetRequiredService<PulseLinkDbContext>().Database.MigrateAsync();
+            failure.Armed = true;
+            await DbSeeder.SeedAsync(services);
+            Assert.True(failure.OpenAttempts >= 2);
+            using var check = services.CreateScope();
+            var db = check.ServiceProvider.GetRequiredService<PulseLinkDbContext>();
+            Assert.Equal(3, await db.Users.CountAsync());
+            Assert.Equal(1, await db.Agencies.CountAsync());
+        }
+        finally { await LocalDb.DropDatabaseAsync(catalog); }
+    }
+
+    private sealed class FirstOpenFailure : DbConnectionInterceptor
+    {
+        public bool Armed { get; set; }
+        public int OpenAttempts { get; private set; }
+        public override ValueTask<InterceptionResult> ConnectionOpeningAsync(
+            DbConnection connection, ConnectionEventData eventData, InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            if (Armed && ++OpenAttempts == 1)
+                throw new TimeoutException("Synthetic database resume delay");
+            return ValueTask.FromResult(result);
+        }
     }
 
     private sealed class SeedFixture : IAsyncDisposable
