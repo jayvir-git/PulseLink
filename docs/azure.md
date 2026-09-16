@@ -49,3 +49,30 @@ this demonstration deployment.
 ### Serverless database startup
 
 Azure SQL serverless can return error 40613 while resuming. Startup opens the SQL connection with a bounded transient retry before seeding roles and demo data. Only connection opening is retried; seed writes and clinical requests are not replayed by this startup policy. The connection is disposed with the seed scope. Database migration remains controlled by `Database:MigrateOnStartup`.
+
+## Custom domain through Cloudflare
+
+The demonstration uses `https://pulselink.jayvir.dev` through a Cloudflare Worker
+while the application and database remain on Azure. The Worker source is
+[`infra/cloudflare/worker.mjs`](../infra/cloudflare/worker.mjs). Its origin is fixed
+to the Azure app; request paths, queries, authorization headers, and bodies pass
+through. Responses use `Cache-Control: no-store`, and redirects to the Azure origin
+are rewritten to the incoming hostname. The proxy contains no application secrets.
+
+To reproduce the setup using the dashboards:
+
+1. Add the domain to Cloudflare's Free plan, preserve existing DNS records, and set
+   the registrar's nameservers to the pair assigned by Cloudflare.
+2. In Workers & Pages, create a Worker and replace its starter code with
+   `worker.mjs`. Deploy the source and check its `workers.dev` URL.
+3. Under the Worker's Domains tab, add a custom domain, selecting the zone and
+   entering `pulselink` as the subdomain. Cloudflare manages that DNS record and
+   its HTTPS certificate. Wait for DNS and certificate activation before testing.
+4. Verify the landing page, sign-in, and incident retrieval on the custom domain.
+   Azure's direct URL remains available for troubleshooting.
+
+Run `node --test infra/cloudflare/worker.test.mjs` to check authenticated write
+forwarding, redirect handling, and network failures. CI runs these tests too.
+Keep the Worker on its Free plan and monitor its request allowance in Cloudflare;
+the proxy does not remove Azure's own free-tier quotas or idle startup delay.
+Use only fictional patient information in this demonstration.
