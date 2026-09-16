@@ -1,5 +1,26 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly details: unknown;
+
+  constructor(status: number, message: string, details: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
+  }
+
+  get code(): string | undefined {
+    return this.details !== null && typeof this.details === 'object' && 'code' in this.details
+      && typeof this.details.code === 'string' ? this.details.code : undefined;
+  }
+}
+
+function versionHeader(version: string): HeadersInit {
+  return { 'If-Match': `"${version}"` };
+}
+
 export type AuthUser = {
   token: string;
   email: string;
@@ -30,13 +51,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
+    let details: unknown = null;
     try {
-      const body = await res.json();
-      message = body.message ?? message;
+      details = await res.json();
+      if (details !== null && typeof details === 'object' && 'message' in details
+        && typeof details.message === 'string') message = details.message;
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    throw new ApiError(res.status, message, details);
   }
 
   if (res.status === 204) return undefined as T;
@@ -63,8 +86,8 @@ export const api = {
   agencies: () =>
     request<{ id: string; name: string; region: string }[]>('/api/lookup/agencies'),
 
-  incidents: () =>
-    request<PagedIncidentList>('/api/incidents?page=1&pageSize=50').then((page) => page.items),
+  incidents: (page = 1) =>
+    request<PagedIncidentList>(`/api/incidents?page=${page}&pageSize=50`),
 
   incident: (id: string) => request<IncidentDetail>(`/api/incidents/${id}`),
 
@@ -74,27 +97,31 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  updateIncident: (id: string, body: CreateIncidentBody) =>
+  updateIncident: (id: string, body: CreateIncidentBody, version: string) =>
     request<IncidentDetail>(`/api/incidents/${id}`, {
       method: 'PUT',
+      headers: versionHeader(version),
       body: JSON.stringify(body),
     }),
 
-  addVital: (id: string, body: Record<string, unknown>) =>
+  addVital: (id: string, body: Record<string, unknown>, version: string) =>
     request<IncidentDetail>(`/api/incidents/${id}/vitals`, {
       method: 'POST',
+      headers: versionHeader(version),
       body: JSON.stringify(body),
     }),
 
-  addIntervention: (id: string, body: Record<string, unknown>) =>
-    request<IncidentDetail>(`/api/incidents/${id}/interventions`, {
+  addIntervention: (id: string, body: Record<string, unknown>, version: string, key: string) =>
+    request<InterventionOperation>(`/api/incidents/${id}/interventions`, {
       method: 'POST',
+      headers: { ...versionHeader(version), 'Idempotency-Key': key },
       body: JSON.stringify(body),
     }),
 
-  transition: (id: string, toStatus: string) =>
+  transition: (id: string, toStatus: string, version: string) =>
     request<IncidentDetail>(`/api/incidents/${id}/status`, {
       method: 'POST',
+      headers: versionHeader(version),
       body: JSON.stringify({ toStatus }),
     }),
 
@@ -106,6 +133,12 @@ export type PagedIncidentList = {
   page: number;
   pageSize: number;
   totalCount: number;
+};
+
+export type InterventionOperation = {
+  incidentId: string;
+  interventionId: string;
+  performedAt: string;
 };
 
 export type IncidentSummary = {
@@ -120,6 +153,7 @@ export type IncidentSummary = {
 };
 
 export type IncidentDetail = IncidentSummary & {
+  version: string;
   patientAgeRange?: string | null;
   patientSex?: string | null;
   notes?: string | null;

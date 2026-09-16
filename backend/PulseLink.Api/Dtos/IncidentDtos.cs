@@ -35,6 +35,8 @@ public record AddInterventionRequest(
 
 public record TransitionStatusRequest([Required] IncidentStatus ToStatus);
 
+public record InterventionOperationDto(Guid IncidentId, Guid InterventionId, DateTimeOffset PerformedAt);
+
 public record VitalDto(
     Guid Id,
     DateTimeOffset RecordedAt,
@@ -80,6 +82,7 @@ public record PagedIncidentListDto(
 
 public record IncidentDetailDto(
     Guid Id,
+    Guid Version,
     string IncidentNumber,
     IncidentStatus Status,
     string ChiefComplaint,

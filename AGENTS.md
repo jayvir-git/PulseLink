@@ -53,7 +53,7 @@ cd frontend && npm run dev
 
 Migrations: SQLite is the default set (`SqlitePulseLinkDbContext`, `Data/Migrations/Sqlite`). SQL Server is a separate set (`SqlServerPulseLinkDbContext`, `Data/Migrations/SqlServer`). Always pass `--context` and `--output-dir`. Commands and startup-vs-deploy migrate behavior: [docs/database.md](docs/database.md). List indexes and measured plans: [docs/performance.md](docs/performance.md).
 
-CI (`.github/workflows/ci.yml`) runs `dotnet test PulseLink.sln` and `npm run build` in `frontend`. Tests use SQLite. SQL Server ordering facts require LocalDB and skip when it is not there.
+CI (`.github/workflows/ci.yml`) runs backend tests, the frontend build, and browser tests on Ubuntu. A Windows job sets `PULSELINK_REQUIRE_SQLSERVER=1` to run HTTP contracts against disposable SQL Server LocalDB catalogs and fail if LocalDB is unavailable. Ordinary local runs use SQLite HTTP fixtures and skip optional SQL Server facts when LocalDB is absent. See `docs/testing.md`.
 
 ## Engineering guardrails
 

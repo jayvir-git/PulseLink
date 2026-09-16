@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 using PulseLink.Api.Dtos;
 using PulseLink.Api.Services;
 using PulseLink.Core.Domain;
@@ -80,11 +82,20 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             return BadRequest(new { message = "No agency is configured." });
         }
 
+        var validationError = await ValidateDestinationAsync(IncidentStatus.Draft, request.DestinationHospitalId);
+        if (validationError is not null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
         var now = DateTimeOffset.UtcNow;
+        var incidentId = Guid.NewGuid();
         var incident = new Incident
         {
-            Id = Guid.NewGuid(),
-            IncidentNumber = $"PCR-{now:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}",
+            Id = incidentId,
+            // Reuse the full identity rather than a small daily random range.
+            // This fits the existing 40-character column; old numbers stay valid.
+            IncidentNumber = $"PCR-{incidentId:N}",
             Status = IncidentStatus.Draft,
             AgencyId = agencyId.Value,
             DestinationHospitalId = request.DestinationHospitalId,
@@ -128,9 +139,20 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             return Forbid();
         }
 
+        if (CheckVersion(incident) is { } preconditionError)
+        {
+            return preconditionError;
+        }
+
         if (incident.Status == IncidentStatus.HandedOff)
         {
             return BadRequest(new { message = "Handed-off incidents cannot be edited." });
+        }
+
+        var validationError = await ValidateDestinationAsync(incident.Status, request.DestinationHospitalId);
+        if (validationError is not null)
+        {
+            return BadRequest(new { message = validationError });
         }
 
         incident.ChiefComplaint = request.ChiefComplaint.Trim();
@@ -150,7 +172,10 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        await db.SaveChangesAsync();
+        if (await SaveIncidentAsync(incident) is { } saveError)
+        {
+            return saveError;
+        }
         return Ok(IncidentMapper.ToDetail((await LoadDetailAsync(id))!));
     }
 
@@ -167,6 +192,11 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
         if (!CanAccess(incident))
         {
             return Forbid();
+        }
+
+        if (CheckVersion(incident) is { } preconditionError)
+        {
+            return preconditionError;
         }
 
         if (incident.Status == IncidentStatus.HandedOff)
@@ -200,13 +230,16 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        await db.SaveChangesAsync();
+        if (await SaveIncidentAsync(incident) is { } saveError)
+        {
+            return saveError;
+        }
         return Ok(IncidentMapper.ToDetail((await LoadDetailAsync(id))!));
     }
 
     [HttpPost("{id:guid}/interventions")]
     [Authorize(Roles = AppRoles.Paramedic + "," + AppRoles.Admin)]
-    public async Task<ActionResult<IncidentDetailDto>> AddIntervention(Guid id, [FromBody] AddInterventionRequest request)
+    public async Task<ActionResult<InterventionOperationDto>> AddIntervention(Guid id, [FromBody] AddInterventionRequest request)
     {
         var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
         if (incident is null)
@@ -219,12 +252,28 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             return Forbid();
         }
 
+        if (!Guid.TryParseExact(Request.Headers["Idempotency-Key"].ToString(), "D", out var key) || key == Guid.Empty)
+        {
+            return BadRequest(new { code = "idempotency_key_required", message = "Send a nonempty UUID in Idempotency-Key for this intervention." });
+        }
+
+        var fingerprint = InterventionRequestIdentity.Fingerprint(request);
+        if (await ReplayInterventionAsync(id, key, fingerprint) is { } replay)
+        {
+            return replay;
+        }
+
+        if (CheckVersion(incident) is { } preconditionError)
+        {
+            return preconditionError;
+        }
+
         if (incident.Status == IncidentStatus.HandedOff)
         {
             return BadRequest(new { message = "Cannot add interventions after handoff." });
         }
 
-        db.Interventions.Add(new Intervention
+        var intervention = new Intervention
         {
             Id = Guid.NewGuid(),
             IncidentId = id,
@@ -234,7 +283,8 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             Dose = request.Dose,
             Route = request.Route,
             Notes = request.Notes
-        });
+        };
+        db.Interventions.Add(intervention);
 
         incident.UpdatedAt = DateTimeOffset.UtcNow;
         db.AuditEvents.Add(new AuditEvent
@@ -247,8 +297,34 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        await db.SaveChangesAsync();
-        return Ok(IncidentMapper.ToDetail((await LoadDetailAsync(id))!));
+        var completed = DateTime.UtcNow;
+        var operation = new InterventionOperation
+        {
+            IncidentId = id, ActorUserId = CurrentUserId(), Key = key, Fingerprint = fingerprint,
+            InterventionId = intervention.Id, PerformedAt = intervention.PerformedAt,
+            CompletedAtUtc = completed, ExpiresAtUtc = completed.AddHours(24)
+        };
+        db.InterventionOperations.Add(operation);
+        try
+        {
+            if (await SaveIncidentAsync(incident) is { } saveError)
+            {
+                // A same-key winner may have committed while this request waited.
+                // Busy failures remain retryable with the identical request key.
+                if (saveError.StatusCode == StatusCodes.Status412PreconditionFailed
+                    && await ReplayInterventionAsync(id, key, fingerprint) is { } winningResult)
+                    return winningResult;
+                return saveError;
+            }
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            db.ChangeTracker.Clear();
+            if (await ReplayInterventionAsync(id, key, fingerprint) is { } winningResult)
+                return winningResult;
+            throw; // A different constraint failed; do not misreport it as a replay.
+        }
+        return Ok(new InterventionOperationDto(id, intervention.Id, intervention.PerformedAt));
     }
 
     [HttpPost("{id:guid}/status")]
@@ -264,6 +340,11 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
         if (!CanAccess(incident))
         {
             return Forbid();
+        }
+
+        if (CheckVersion(incident) is { } preconditionError)
+        {
+            return preconditionError;
         }
 
         try
@@ -293,7 +374,10 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        await db.SaveChangesAsync();
+        if (await SaveIncidentAsync(incident) is { } saveError)
+        {
+            return saveError;
+        }
         return Ok(IncidentMapper.ToDetail((await LoadDetailAsync(id))!));
     }
 
@@ -396,6 +480,109 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
         return Ok(payload);
     }
 
+    // Call only after authorizing this actor's access to the incident. The fixed
+    // operation table plus actor/incident/key unique index define the key's scope.
+    private async Task<ObjectResult?> ReplayInterventionAsync(Guid incidentId, Guid key, string fingerprint)
+    {
+        var actor = CurrentUserId();
+        var operation = await db.InterventionOperations.AsNoTracking().SingleOrDefaultAsync(
+            o => o.IncidentId == incidentId && o.ActorUserId == actor && o.Key == key);
+        if (operation is null) return null;
+        if (operation.ExpiresAtUtc <= DateTime.UtcNow)
+            return StatusCode(StatusCodes.Status410Gone, new
+            {
+                code = "idempotency_key_expired", message = "This completed request has expired. Review the incident; do not resend it as a new intervention."
+            });
+        if (!string.Equals(operation.Fingerprint, fingerprint, StringComparison.Ordinal))
+            return Conflict(new
+            {
+                code = "idempotency_key_reused", message = "This request key was already used with different intervention details."
+            });
+        return Ok(new InterventionOperationDto(operation.IncidentId, operation.InterventionId, operation.PerformedAt));
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 or 1555 }
+            or SqlException { Number: 2601 or 2627 };
+
+    private ObjectResult? CheckVersion(Incident incident)
+    {
+        var raw = Request.Headers.IfMatch.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return StatusCode(StatusCodes.Status428PreconditionRequired, new
+            {
+                code = "version_required", message = "Reload the incident and send its version in If-Match."
+            });
+        }
+
+        // Exactly one strong, quoted GUID. Wildcards, weak tags and lists cannot
+        // establish which incident state the caller reviewed.
+        if (raw.Length != 38 || raw[0] != '"' || raw[^1] != '"'
+            || !Guid.TryParseExact(raw[1..^1], "D", out var version))
+        {
+            return BadRequest(new { code = "invalid_version", message = "If-Match must contain one quoted incident version." });
+        }
+
+        return version == incident.Version ? null : VersionConflict();
+    }
+
+    private ObjectResult VersionConflict() => StatusCode(StatusCodes.Status412PreconditionFailed, new
+    {
+        code = "incident_conflict",
+        message = "This incident changed since you loaded it. Reload and review the latest state before submitting again."
+    });
+
+    private async Task<ObjectResult?> SaveIncidentAsync(Incident incident)
+    {
+        // Even a no-op edit or a child append within the clock's resolution must
+        // update the parent and check its original version in the database.
+        db.Entry(incident).Property(i => i.Version).IsModified = true;
+        try
+        {
+            // EF's transaction includes the incident update, child inserts and audit.
+            await db.SaveChangesAsync();
+            return null;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return VersionConflict();
+        }
+        catch (Exception ex) when (IsWriteContention(ex))
+        {
+            db.ChangeTracker.Clear();
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                code = "incident_busy",
+                message = "The incident could not be saved because the database is busy. Reload and review before trying again."
+            });
+        }
+    }
+
+    private static bool IsWriteContention(Exception ex) =>
+        ex is SqliteException { SqliteErrorCode: 5 or 6 } or SqlException { Number: 1205 }
+        || ex is DbUpdateException { InnerException: { } inner } && IsWriteContention(inner);
+
+    private async Task<string?> ValidateDestinationAsync(IncidentStatus status, Guid? hospitalId)
+    {
+        try
+        {
+            IncidentStatusMachine.EnsureValidState(status, hospitalId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
+
+        if (hospitalId is not null && !await db.Hospitals.AnyAsync(h => h.Id == hospitalId))
+        {
+            return "Destination hospital does not exist.";
+        }
+
+        return null;
+    }
+
     private async Task<Incident?> LoadDetailAsync(Guid id) =>
         await db.Incidents
             .AsNoTracking()
@@ -415,9 +602,7 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
 
         if (User.IsInRole(AppRoles.HospitalStaff))
         {
-            var hospitalId = CurrentHospitalId();
-            return query.Where(i => i.DestinationHospitalId == hospitalId
-                && (i.Status == IncidentStatus.Arrived || i.Status == IncidentStatus.HandedOff || i.Status == IncidentStatus.Transporting));
+            return query.Where(IncidentRoleQueries.HospitalVisibility(CurrentHospitalId()));
         }
 
         var agencyId = CurrentAgencyId();
@@ -434,7 +619,7 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
 
         if (User.IsInRole(AppRoles.HospitalStaff))
         {
-            return incident.DestinationHospitalId == CurrentHospitalId();
+            return IncidentRoleQueries.HospitalVisibility(CurrentHospitalId()).Compile()(incident);
         }
 
         return incident.AgencyId == CurrentAgencyId() || incident.CreatedByUserId == CurrentUserId();

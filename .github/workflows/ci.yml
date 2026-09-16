@@ -23,7 +23,14 @@ jobs:
         run: dotnet build PulseLink.sln --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test PulseLink.sln --no-build --configuration Release --verbosity normal
+        run: dotnet test PulseLink.sln --no-build --configuration Release --verbosity minimal --logger "trx;LogFileName=sqlite.trx" --results-directory TestResults
+
+      - name: Publish backend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlite-test-results
+          path: TestResults/*.trx
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,3 +46,41 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Install browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser reliability tests
+        working-directory: frontend
+        run: npm run test:browser
+
+      - name: Live API reliability smoke check
+        working-directory: frontend
+        run: npm run test:live
+
+  sqlserver-test:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      PULSELINK_REQUIRE_SQLSERVER: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Start isolated runner LocalDB
+        shell: pwsh
+        run: |
+          sqllocaldb start MSSQLLocalDB
+          if ($LASTEXITCODE -ne 0) { throw 'Required SQL Server LocalDB failed to start.' }
+      - name: Test SQL Server HTTP contracts and migrations
+        run: dotnet test PulseLink.sln --configuration Release --verbosity minimal --logger "console;verbosity=normal" --logger "trx;LogFileName=sqlserver.trx" --results-directory TestResults --blame-hang-timeout 3m --blame-hang-dump-type none
+      - name: Publish SQL Server test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlserver-test-results
+          path: |
+            TestResults/*.trx
+            TestResults/**/*Sequence*.xml

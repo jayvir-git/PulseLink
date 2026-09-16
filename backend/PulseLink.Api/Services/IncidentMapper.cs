@@ -20,6 +20,7 @@ public static class IncidentMapper
     public static IncidentDetailDto ToDetail(Incident incident) =>
         new(
             incident.Id,
+            incident.Version,
             incident.IncidentNumber,
             incident.Status,
             incident.ChiefComplaint,

@@ -3,6 +3,21 @@ namespace PulseLink.Tests.Infrastructure;
 public class LocalDbAvailabilityTests
 {
     [Fact]
+    public void RequiredSqlServer_MustBeAvailable()
+    {
+        Assert.True(!LocalDb.Required || LocalDb.IsAvailable,
+            "PULSELINK_REQUIRE_SQLSERVER=1 requires an accessible SQL Server LocalDB instance; refusing to skip provider coverage.");
+    }
+
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    public void RequiredProvider_IsNeverSkipped(bool required, bool available, bool expectedSkip)
+        => Assert.Equal(expectedSkip, LocalDb.ShouldSkip(required, available));
+
+    [Fact]
     public void Detect_ReturnsFalse_WithoutConnecting_WhenNotWindows()
     {
         var connected = false;
@@ -34,7 +49,7 @@ public class LocalDbAvailabilityTests
     public void FactAttribute_DoesNotThrowDuringConstruction()
     {
         var attr = new LocalDbFactAttribute();
-        if (OperatingSystem.IsWindows() && LocalDb.IsAvailable)
+        if (LocalDb.Required || LocalDb.IsAvailable)
         {
             Assert.True(string.IsNullOrEmpty(attr.Skip));
         }

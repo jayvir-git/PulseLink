@@ -28,7 +28,13 @@ public static class IncidentStatusMachine
             throw new InvalidOperationException($"Cannot transition from {from} to {to}.");
         }
 
-        if (to is IncidentStatus.Transporting or IncidentStatus.Arrived or IncidentStatus.HandedOff
+        EnsureValidState(to, destinationHospitalId);
+    }
+
+    // Edits must preserve the same destination rule even without a status transition.
+    public static void EnsureValidState(IncidentStatus status, Guid? destinationHospitalId)
+    {
+        if (status is IncidentStatus.Transporting or IncidentStatus.Arrived or IncidentStatus.HandedOff
             && destinationHospitalId is null)
         {
             throw new InvalidOperationException("A destination hospital is required before transport or handoff.");
