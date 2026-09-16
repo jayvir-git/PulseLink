@@ -59,6 +59,17 @@ jobs:
         working-directory: frontend
         run: npm run test:live
 
+      - name: Publish combined app
+        run: |
+          dotnet publish backend/PulseLink.Api -c Release -o artifacts/hosted
+          cp -r frontend/dist artifacts/hosted/wwwroot
+
+      - name: Hosted package smoke check
+        working-directory: frontend
+        env:
+          PULSELINK_PACKAGE_PATH: ../artifacts/hosted
+        run: node --test tests/hosted-package.smoke.mjs
+
   sqlserver-test:
     runs-on: windows-2022
     timeout-minutes: 20

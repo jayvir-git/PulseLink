@@ -50,6 +50,8 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
     a.setDefaultTimeout(10000);
     b.setDefaultTimeout(10000);
     await a.goto(origin);
+    await a.getByLabel('Email', { exact: true }).fill('paramedic@pulselink.demo');
+    await a.getByLabel('Password', { exact: true }).fill('Demo123!');
     await a.getByRole('button', { name: 'Sign in', exact: true }).click();
     await a.getByRole('heading', { name: 'Incidents', exact: true }).waitFor();
     for (const page of [a, b]) {

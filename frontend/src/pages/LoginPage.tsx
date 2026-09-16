@@ -10,8 +10,8 @@ const demos = [
 
 export function LoginPage() {
   const { user, login } = useAuth();
-  const [email, setEmail] = useState('paramedic@pulselink.demo');
-  const [password, setPassword] = useState('Demo123!');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'paramedic@pulselink.demo' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'Demo123!' : '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -57,7 +57,7 @@ export function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <div className="demo-accounts">
+        {import.meta.env.DEV && <div className="demo-accounts">
           <p>Demo accounts (password: Demo123!)</p>
           <div className="demo-row">
             {demos.map((d) => (
@@ -66,7 +66,7 @@ export function LoginPage() {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

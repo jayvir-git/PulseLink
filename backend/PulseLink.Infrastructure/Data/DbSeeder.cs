@@ -45,6 +45,14 @@ public static class DbSeeder
             return;
         }
 
+        var password = configuration["Demo:Password"];
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            if (!environment.IsDevelopment())
+                throw new InvalidOperationException("Set Demo:Password before initializing hosted demo accounts.");
+            password = "Demo123!";
+        }
+
         var agency = new Agency
         {
             Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
@@ -70,9 +78,9 @@ public static class DbSeeder
         db.Hospitals.AddRange(hospital, hospital2);
         await db.SaveChangesAsync();
 
-        await CreateUserAsync(userManager, "paramedic@pulselink.demo", "Paramedic Demo", "Demo123!", AppRoles.Paramedic, agency.Id, null);
-        await CreateUserAsync(userManager, "hospital@pulselink.demo", "Hospital Demo", "Demo123!", AppRoles.HospitalStaff, null, hospital.Id);
-        await CreateUserAsync(userManager, "admin@pulselink.demo", "Admin Demo", "Demo123!", AppRoles.Admin, null, null);
+        await CreateUserAsync(userManager, "paramedic@pulselink.demo", "Paramedic Demo", password, AppRoles.Paramedic, agency.Id, null);
+        await CreateUserAsync(userManager, "hospital@pulselink.demo", "Hospital Demo", password, AppRoles.HospitalStaff, null, hospital.Id);
+        await CreateUserAsync(userManager, "admin@pulselink.demo", "Admin Demo", password, AppRoles.Admin, null, null);
     }
 
     private static async Task CreateUserAsync(
