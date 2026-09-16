@@ -34,9 +34,11 @@ public static class LocalDb
 
     public static async Task DropDatabaseAsync(string database)
     {
-        await using var conn = new SqlConnection(ConnectionString("master"));
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
+        // The fixture also has a synchronous Dispose path. Never post SQL
+        // cleanup continuations back to a caller that is waiting for disposal.
+        using var conn = new SqlConnection(ConnectionString("master"));
+        await conn.OpenAsync().ConfigureAwait(false);
+        using var cmd = conn.CreateCommand();
         cmd.CommandText =
             $"""
             IF DB_ID(N'{database}') IS NOT NULL
@@ -45,7 +47,7 @@ public static class LocalDb
                 DROP DATABASE [{database}];
             END
             """;
-        await cmd.ExecuteNonQueryAsync();
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
     /// <summary>

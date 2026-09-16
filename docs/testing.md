@@ -275,3 +275,20 @@ The complete required SQL Server Release suite then passed all 129 tests with ze
 failures or skips, bringing the final provider verification up to date.
 This automated walkthrough replaces the earlier verification gap; no human-operated
 demo or hosted Actions run is claimed.
+
+## Hosted CI cleanup regression
+
+The first draft-PR run passed Ubuntu, including browser and live API checks, but
+the SQL Server test host stalled after compilation. It was stopped for diagnosis.
+A focused regression then reproduced synchronous fixture disposal waiting on a SQL
+cleanup continuation queued to the caller's blocked synchronization context. The
+database-drop helper now avoids capturing that context and uses synchronous resource
+disposal after its asynchronous commands finish. The regression holds caller-context
+callbacks and requires disposal to complete independently, releasing callbacks on
+failure so its temporary catalog can still be removed.
+
+The SQL Server CI command now reports individual test progress and terminates a
+hung test after three minutes, uploading the sequence of test names with TRX results.
+Memory dumps are disabled so diagnostics do not capture request or credential data.
+After the cleanup fix, all 130 tests passed locally in required SQL Server Release
+mode with no skips, and the frontend build passed.

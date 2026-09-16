@@ -75,10 +75,12 @@ jobs:
           sqllocaldb start MSSQLLocalDB
           if ($LASTEXITCODE -ne 0) { throw 'Required SQL Server LocalDB failed to start.' }
       - name: Test SQL Server HTTP contracts and migrations
-        run: dotnet test PulseLink.sln --configuration Release --verbosity minimal --logger "trx;LogFileName=sqlserver.trx" --results-directory TestResults
+        run: dotnet test PulseLink.sln --configuration Release --verbosity minimal --logger "console;verbosity=normal" --logger "trx;LogFileName=sqlserver.trx" --results-directory TestResults --blame-hang-timeout 3m --blame-hang-dump-type none
       - name: Publish SQL Server test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sqlserver-test-results
-          path: TestResults/*.trx
+          path: |
+            TestResults/*.trx
+            TestResults/**/*Sequence*.xml
