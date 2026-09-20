@@ -179,6 +179,7 @@ async function scenario(afterConflictStatus, operation, failureMode = 'conflict'
 test('Navigating to another incident discards the previous incident retry state', async () => {
   const { context, page, release } = await scenario('Arrived', 'intervention', 'lost');
   try {
+    await page.getByLabel('Intervention name', { exact: true }).fill('Synthetic observation');
     await page.getByRole('button', { name: 'Add intervention', exact: true }).click();
     release();
     await page.getByText('The intervention result is uncertain. Keep this page open and retry the same intervention.', { exact: true }).waitFor();
@@ -195,7 +196,7 @@ test('Navigating to another incident discards the previous incident retry state'
 test('Vitals conflict keeps input, requires reload, then uses the refreshed version', { timeout: 30000 }, async () => {
   const s = await scenario('Arrived', 'vitals');
   try {
-    const heartRate = s.page.getByLabel('heartRate', { exact: true });
+    const heartRate = s.page.getByLabel('Heart rate (bpm)', { exact: true });
     await heartRate.fill('123');
     await s.page.getByRole('button', { name: 'Generate FHIR-like JSON' }).click();
     await s.page.locator('pre.export').waitFor();
@@ -229,7 +230,7 @@ for (const failureMode of ['lost', 'busy']) {
   test(`Intervention ${failureMode} response reuses the key and payload; a deliberate second action gets a new key`, { timeout: 30000 }, async () => {
     const s = await scenario('Arrived', 'interventions', failureMode);
     try {
-      const name = s.page.getByLabel('name', { exact: true });
+      const name = s.page.getByLabel('Intervention name', { exact: true });
       await name.fill('Synthetic intended intervention');
       const submit = s.page.getByRole('button', { name: 'Add intervention', exact: true });
       await submit.click();
@@ -261,7 +262,7 @@ for (const failureMode of ['lost', 'busy']) {
 test('Handoff conflict preserves intervention input and prevents further clinical submission', { timeout: 30000 }, async () => {
   const s = await scenario('HandedOff', 'interventions');
   try {
-    const name = s.page.getByLabel('name', { exact: true });
+    const name = s.page.getByLabel('Intervention name', { exact: true });
     await name.fill('Unsaved synthetic intervention');
     await s.page.getByRole('button', { name: 'Add intervention', exact: true }).click();
     s.release();
@@ -300,4 +301,36 @@ test('Status conflict uses the same reload-and-review flow', { timeout: 30000 },
     s.release();
     await s.context.close();
   }
+});
+
+test('Clinical forms start blank and an empty observation is never submitted', async () => {
+  const s = await scenario('Arrived', 'vitals');
+  try {
+    for (const label of ['Heart rate (bpm)', 'Systolic BP (mmHg)', 'Diastolic BP (mmHg)', 'Respiratory rate (/min)', 'Oxygen saturation (%)', 'Temperature (°C)', 'Glasgow Coma Scale', 'Intervention name', 'Medication', 'Dose', 'Route', 'Intervention notes']) {
+      assert.equal(await s.page.getByLabel(label, { exact: true }).inputValue(), '');
+    }
+    await s.page.getByRole('button', { name: 'Add vitals', exact: true }).click();
+    await s.page.getByText('Enter at least one observation before adding vitals.').waitFor();
+    assert.equal(s.writes.length, 0);
+    await s.page.getByLabel('Heart rate (bpm)', { exact: true }).fill('0');
+    await s.page.getByRole('button', { name: 'Add vitals', exact: true }).click();
+    s.release();
+    await s.page.getByRole('button', { name: 'Reload latest incident' }).waitFor();
+    assert.equal(s.writes[0].body.heartRate, 0, 'A recorded zero must not turn into missing data');
+    assert.equal(s.writes[0].body.temperatureC, null);
+    assert.equal(s.writes[0].body.systolicBp, null);
+  } finally { s.release(); await s.context.close(); }
+});
+
+test('Public landing leads to sign in and fits a narrow screen', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(origin);
+    await page.getByRole('heading', { name: /One handoff.*Every detail connected/ }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.getByRole('link', { name: 'Open your workspace' }).click();
+    assert.equal(await page.getByLabel('Email', { exact: true }).inputValue(), '');
+    assert.equal(await page.getByLabel('Password', { exact: true }).inputValue(), '');
+  } finally { await context.close(); }
 });
