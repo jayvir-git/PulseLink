@@ -4,6 +4,18 @@ EMS-to-hospital patient handoff platform.
 
 Paramedics document a lightweight patient care report (PCR) in the field, advance transport status, and deliver a structured handoff summary to receiving hospital staff — with role-based access and an append-only audit trail.
 
+## Live demo
+
+**[pulselink.jayvir.dev](https://pulselink.jayvir.dev)**
+
+A demonstration deployment. The API and the React production build are served from one Azure App Service running .NET 8, with Azure SQL as the database, reached through a Cloudflare Worker on a custom domain.
+
+The landing page and the sign-in screen are public. **The clinical workspace requires an account, and the hosted demo credentials are not published here.** The seeded credentials below are for local runs only.
+
+It runs on free tiers, so the first request after an idle period can take up to a minute while the app and its database resume; later requests are fast. Free quotas can interrupt the demo.
+
+Use fictional patient information only. Deployment and configuration: [docs/azure.md](docs/azure.md).
+
 ## Stack
 
 - **Backend:** ASP.NET Core 8, C#, EF Core, ASP.NET Identity, JWT
@@ -11,6 +23,7 @@ Paramedics document a lightweight patient care report (PCR) in the field, advanc
 - **Database:** SQLite locally by default; SQL Server is a second provider (see [docs/database.md](docs/database.md))
 - **Tests:** xUnit
 - **CI:** GitHub Actions
+- **Hosting (demo):** Azure App Service and Azure SQL, custom domain through a Cloudflare Worker (see [docs/azure.md](docs/azure.md))
 
 ## Quick start
 
@@ -124,4 +137,4 @@ More detail: [docs/architecture.md](docs/architecture.md). List query indexes: [
 
 ## Deployment notes
 
-The data model supports SQLite (local default) and SQL Server. Typical cloud layout: API on Azure App Service, frontend on Azure Static Web Apps, JWT signing key in App Settings or Key Vault, Azure SQL with `Database:Provider=SqlServer`. See [docs/database.md](docs/database.md) and the architecture doc for concrete steps.
+The data model supports SQLite (local default) and SQL Server. The hosted demonstration serves the API and the React build from a single Windows App Service running .NET 8, with Azure SQL as its database and a Cloudflare Worker providing the custom HTTPS domain; `scripts/package-azure.ps1` builds the deployment ZIP. Required application settings, free-tier caveats and the custom-domain steps: [docs/azure.md](docs/azure.md). Provider settings and migrations: [docs/database.md](docs/database.md).
