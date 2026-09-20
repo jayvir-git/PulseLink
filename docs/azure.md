@@ -56,8 +56,16 @@ The demonstration uses `https://pulselink.jayvir.dev` through a Cloudflare Worke
 while the application and database remain on Azure. The Worker source is
 [`infra/cloudflare/worker.mjs`](../infra/cloudflare/worker.mjs). Its origin is fixed
 to the Azure app; request paths, queries, authorization headers, and bodies pass
-through. Responses use `Cache-Control: no-store`, and redirects to the Azure origin
-are rewritten to the incoming hostname. The proxy contains no application secrets.
+through. Redirects to the Azure origin are rewritten to the incoming hostname. The
+proxy contains no application secrets.
+
+Caching is an allowlist, and everything not on it keeps reaching the App Service.
+Content-hashed bundles under `/assets` are cached at the edge and by the browser for
+a year; unhashed files copied from `public/` (`.svg`, `.png`, `.ico`, `.webmanifest`,
+`.woff`, `.woff2`) get an hour. The document, SPA routes and every `/api` path stay
+`no-store`, as does any request carrying an `Authorization` header and any response
+outside the 2xx range, so a failed deployment cannot pin a 404 at the edge. This
+matters on the free tiers: without it every asset request spends App Service CPU.
 
 To reproduce the setup using the dashboards:
 
