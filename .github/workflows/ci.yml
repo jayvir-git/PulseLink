@@ -46,9 +46,19 @@ jobs:
       - name: Test Cloudflare proxy
         run: node --test infra/cloudflare/worker.test.mjs
 
+      - name: Demo status machine matches the server
+        working-directory: frontend
+        run: node --test tests/demo-status-machine.test.mjs
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      # Cloudflare Pages builds this from main; fail here rather than there.
+      # Separate outDir so the hosted package below still copies the real build.
+      - name: Build browser demo
+        working-directory: frontend
+        run: npm run build:demo -- --outDir dist-demo
 
       - name: Install browser
         working-directory: frontend
