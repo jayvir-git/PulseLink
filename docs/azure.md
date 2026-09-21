@@ -67,6 +67,29 @@ a year; unhashed files copied from `public/` (`.svg`, `.png`, `.ico`, `.webmanif
 outside the 2xx range, so a failed deployment cannot pin a 404 at the edge. This
 matters on the free tiers: without it every asset request spends App Service CPU.
 
+The edge cache is keyed on the upstream Azure URL, because that is what the Worker
+fetches, not on `pulselink.jayvir.dev`. Two consequences:
+
+- **Purging `jayvir.dev` URLs in the dashboard does not clear these entries.** The
+  zone purge only matches keys under its own hostname, and the Azure hostname is not
+  a zone in this account.
+- **A file cached by an earlier Worker version with a zero TTL can report
+  `cf-cache-status: REVALIDATED` on every request** instead of `HIT`. Cloudflare checks
+  the stored copy with the App Service each time and gets a bodyless `304`, so the
+  cost is a small request, not the file. Browsers still honour the long
+  `Cache-Control`, so repeat visits do not reach the edge at all. A hashed bundle
+  clears itself on the next deployment because its filename changes; an unhashed file
+  such as `pulselink.svg` keeps revalidating until Cloudflare evicts the entry. This
+  was observed after the caching change was first deployed and is expected, not a
+  regression. Files cached for the first time under the current Worker go `MISS`
+  then `HIT`.
+
+To check a file, request it twice and read the headers:
+
+```bash
+curl -sI https://pulselink.jayvir.dev/assets/<hashed-file>.js | grep -i "cf-cache-status\|cache-control"
+```
+
 To reproduce the setup using the dashboards:
 
 1. Add the domain to Cloudflare's Free plan, preserve existing DNS records, and set
