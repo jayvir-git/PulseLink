@@ -482,3 +482,44 @@ nav.demo-row button { background: white; color: var(--brand-deep); border: 1px s
  .panel, .login-panel { padding: 1.2rem; }
  .grid-3 { grid-template-columns: 1fr; }
 }
+
+/* Demo build only: the browser-local disclosure strip above the app. */
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: .7rem 1.1rem;
+  background: var(--brand-deep);
+  color: #eaf4f0;
+  font-size: .85rem;
+  line-height: 1.45;
+}
+
+.demo-banner strong { color: #fff; }
+
+.demo-banner a {
+  color: #eaf4f0;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.demo-banner-actions {
+  display: flex;
+  gap: .9rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.demo-banner button.ghost {
+  background: transparent;
+  color: #eaf4f0;
+  border: 1px solid rgba(234, 244, 240, .5);
+  padding: .3rem .7rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  .demo-banner { flex-direction: column; align-items: flex-start; }
+}

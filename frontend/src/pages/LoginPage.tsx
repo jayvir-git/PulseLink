@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { IS_DEMO } from '../demo/config';
 
 const demos = [
   { role: 'Paramedic', email: 'paramedic@pulselink.demo' },
@@ -59,7 +60,29 @@ export function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        {import.meta.env.DEV && <div className="demo-accounts">
+        {IS_DEMO && <div className="demo-accounts">
+          <p>Pick a role to continue. No password, and no account is created.</p>
+          <div className="demo-row">
+            {demos.map((d) => (
+              <button
+                key={d.email}
+                type="button"
+                className="ghost"
+                disabled={loading}
+                onClick={() => {
+                  setEmail(d.email);
+                  setError('');
+                  login(d.email, 'demo').catch((err: unknown) => {
+                    setError(err instanceof Error ? err.message : 'Sign in failed');
+                  });
+                }}
+              >
+                Continue as {d.role}
+              </button>
+            ))}
+          </div>
+        </div>}
+        {!IS_DEMO && import.meta.env.DEV && <div className="demo-accounts">
           <p>Demo accounts (password: Demo123!)</p>
           <div className="demo-row">
             {demos.map((d) => (
