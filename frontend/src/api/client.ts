@@ -1,21 +1,9 @@
+import { ApiError } from './errors';
+import { demoApi } from '../demo/demoApi';
+
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
-export class ApiError extends Error {
-  readonly status: number;
-  readonly details: unknown;
-
-  constructor(status: number, message: string, details: unknown) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.details = details;
-  }
-
-  get code(): string | undefined {
-    return this.details !== null && typeof this.details === 'object' && 'code' in this.details
-      && typeof this.details.code === 'string' ? this.details.code : undefined;
-  }
-}
+export { ApiError };
 
 function versionHeader(version: string): HeadersInit {
   return { 'If-Match': `"${version}"` };
@@ -66,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const api = {
+const httpApi = {
   login: (email: string, password: string) =>
     request<AuthUser>('/api/auth/login', {
       method: 'POST',
@@ -127,6 +115,12 @@ export const api = {
 
   exportHandoff: (id: string) => request<unknown>(`/api/incidents/${id}/export`),
 };
+
+// Demo builds swap the transport, not the screens: every page keeps importing
+// `api` and exercises the same states, including conflicts and retries.
+// __DEMO__ is used directly rather than through a re-exported constant so the
+// bundler can fold this ternary and drop the unused side entirely.
+export const api = (__DEMO__ ? demoApi : httpApi) as typeof httpApi;
 
 export type PagedIncidentList = {
   items: IncidentSummary[];
