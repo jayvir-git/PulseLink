@@ -6,13 +6,25 @@ Paramedics document a lightweight patient care report (PCR) in the field, advanc
 
 ## Live demo
 
+### Try it in your browser
+
+**[pulselink-demo.pages.dev](https://pulselink-demo.pages.dev)**
+
+Pick Paramedic, Hospital staff or Admin with one click; no account or password. The full interface runs against seeded incidents, so you can advance transport status, record vitals and interventions, export a handoff, and compare what each role can see.
+
+This build has **no server and no database**. It swaps the HTTP client for an in-browser adapter that applies the same rules as the API: the status machine, role visibility, version conflicts and idempotent intervention retries. Nothing you enter leaves your browser. Open an incident in two tabs and save in both to see a version conflict; **Reset demo data** in the banner restores the seed. The API's own behaviour is verified by the tests in [`backend/PulseLink.Tests`](backend/PulseLink.Tests), which CI runs against SQLite and SQL Server, and a test fails the build if the demo's status machine drifts from the server's.
+
+Run it locally with `npm run dev:demo` in `frontend`, or build it with `npm run build:demo`.
+
+### Hosted deployment
+
 **[pulselink.jayvir.dev](https://pulselink.jayvir.dev)**
 
-A demonstration deployment. The API and the React production build are served from one Azure App Service running .NET 8, with Azure SQL as the database, reached through a Cloudflare Worker on a custom domain.
+The real stack: the API and the React production build are served from one Azure App Service running .NET 8, with Azure SQL as the database, reached through a Cloudflare Worker on a custom domain.
 
 The landing page and the sign-in screen are public. **The clinical workspace requires an account, and the hosted demo credentials are not published here.** The seeded credentials below are for local runs only.
 
-It runs on free tiers, so the first request after an idle period can take up to a minute while the app and its database resume; later requests are fast. Free quotas can interrupt the demo.
+It runs on free tiers, so the first request after an idle period can take up to a minute while the app and its database resume; later requests are fast. Free quotas can interrupt it.
 
 Use fictional patient information only. Deployment and configuration: [docs/azure.md](docs/azure.md).
 
@@ -23,7 +35,7 @@ Use fictional patient information only. Deployment and configuration: [docs/azur
 - **Database:** SQLite locally by default; SQL Server is a second provider (see [docs/database.md](docs/database.md))
 - **Tests:** xUnit
 - **CI:** GitHub Actions
-- **Hosting (demo):** Azure App Service and Azure SQL, custom domain through a Cloudflare Worker (see [docs/azure.md](docs/azure.md))
+- **Hosting:** Azure App Service and Azure SQL, custom domain through a Cloudflare Worker (see [docs/azure.md](docs/azure.md)); browser-only demo build on Cloudflare Pages
 
 ## Quick start
 

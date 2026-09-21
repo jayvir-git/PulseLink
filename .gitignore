@@ -32,3 +32,4 @@ private/
 
 ## Load-test plan captures
 artifacts/
+frontend/dist-demo/
