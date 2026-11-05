@@ -86,7 +86,7 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
     await a.getByRole('button', { name: 'Add intervention', exact: true }).click();
     await a.getByText('The intervention result is uncertain. Keep this page open and retry the same intervention.', { exact: true }).waitFor();
     await a.getByRole('button', { name: 'Retry same intervention' }).click();
-    await a.getByText('Intervention recorded. Adding again will create a separate intervention.', { exact: true }).waitFor();
+    await a.getByText('Intervention recorded. The form is ready for the next treatment.', { exact: true }).waitFor();
     assert.equal(requests.length, 2);
     assert.deepEqual(requests[1], requests[0]);
     await a.getByRole('button', { name: 'Mark Handed Off' }).click();
