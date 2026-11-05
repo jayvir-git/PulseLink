@@ -1,3 +1,4 @@
+import { NARRATIVE_LIMIT } from '../api/limits';
 import { ApiError } from '../api/errors';
 import type {
   AuthUser, CreateIncidentBody, IncidentDetail, InterventionOperation, PagedIncidentList,
@@ -80,10 +81,12 @@ function audit(incident: IncidentDetail, user: AuthUser, action: string, details
 }
 
 function fingerprintOf(body: Record<string, unknown>): string {
-  return JSON.stringify({
-    name: body.name ?? '', medication: body.medication ?? '', dose: body.dose ?? '',
-    route: body.route ?? '', notes: body.notes ?? '',
-  });
+  // Match the server's canonical values. A local equality key needs no hash;
+  // only the name is trimmed, and null remains distinct from an empty string.
+  return JSON.stringify([
+    'intervention-v1', String(body.name ?? '').trim(), body.medication ?? null,
+    body.dose ?? null, body.route ?? null, body.notes ?? null,
+  ]);
 }
 
 function hospitalName(id: string | null | undefined): string | null {
@@ -105,17 +108,27 @@ export const demoApi = {
     return AGENCIES.map((a) => ({ ...a }));
   },
 
-  async incidents(page = 1): Promise<PagedIncidentList> {
+  async incidents(page = 1, queue = 'all'): Promise<PagedIncidentList> {
     const user = currentUser();
     const pageSize = 50;
     const visible = loadState().incidents
       .filter((incident) => visibleTo(user, incident))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const received = (i: IncidentDetail) => i.auditEvents.some(a => a.action === 'HandoffAcknowledged');
+    const queues = {
+      incoming: visible.filter(i => i.status === 'Transporting'),
+      arrived: visible.filter(i => i.status === 'Arrived'),
+      awaiting: visible.filter(i => i.status === 'HandedOff' && !received(i)),
+      received: visible.filter(i => i.status === 'HandedOff' && received(i)),
+    };
+    if (queue !== 'all' && !(queue in queues)) throw new ApiError(400, 'Unknown incident queue.', null);
+    const filtered = queue === 'all' ? visible : queues[queue as keyof typeof queues];
     return {
-      items: visible.slice((page - 1) * pageSize, page * pageSize).map(withComputed),
+      queueCounts: user.role === 'HospitalStaff' ? { incoming: queues.incoming.length, arrived: queues.arrived.length, awaiting: queues.awaiting.length, received: queues.received.length } : undefined,
+      items: filtered.slice((page - 1) * pageSize, page * pageSize).map(i => ({ ...withComputed(i), receiptAcknowledged: received(i) })),
       page,
       pageSize,
-      totalCount: visible.length,
+      totalCount: filtered.length,
     };
   },
 
@@ -131,6 +144,7 @@ export const demoApi = {
     const state = loadState();
     const user = currentUser();
     if (!canWrite(user)) throw forbidden();
+    if ((body.notes?.length ?? 0) > NARRATIVE_LIMIT) throw new ApiError(400, 'Care notes must be 2000 characters or fewer.', null);
     const now = new Date().toISOString();
     const incident: IncidentDetail = {
       id: `demo-incident-${crypto.randomUUID()}`,
@@ -167,6 +181,7 @@ export const demoApi = {
       if (requiresDestination(incident.status) && !body.destinationHospitalId) {
         throw new ApiError(400, 'A destination hospital is required before transport or handoff.', null);
       }
+      if ((body.notes?.length ?? 0) > NARRATIVE_LIMIT) throw new ApiError(400, 'Care notes must be 2000 characters or fewer.', null);
       incident.chiefComplaint = body.chiefComplaint;
       incident.patientAgeRange = body.patientAgeRange ?? null;
       incident.patientSex = body.patientSex ?? null;
@@ -233,10 +248,10 @@ export const demoApi = {
       id: interventionId,
       performedAt,
       name: String(body.name ?? '').trim(),
-      medication: (body.medication as string) || null,
-      dose: (body.dose as string) || null,
-      route: (body.route as string) || null,
-      notes: (body.notes as string) || null,
+      medication: (body.medication as string | null | undefined) ?? null,
+      dose: (body.dose as string | null | undefined) ?? null,
+      route: (body.route as string | null | undefined) ?? null,
+      notes: (body.notes as string | null | undefined) ?? null,
     });
     audit(incident, user, 'InterventionAdded', `Added intervention: ${String(body.name ?? '')}`);
     incident.version = newVersion();
@@ -267,6 +282,29 @@ export const demoApi = {
       if (toStatus === 'HandedOff') incident.handedOffAt = new Date().toISOString();
       audit(incident, user, 'StatusChanged', `Status changed to ${toStatus}`);
     });
+  },
+
+  async acknowledgeReceipt(id: string) {
+    async function recordReceipt() {
+      const user = currentUser();
+      if (user.role !== 'HospitalStaff') throw forbidden();
+      const state = loadState();
+      const incident = state.incidents.find(i => i.id === id);
+      if (!incident) throw notFound();
+      if (!visibleTo(user, incident)) throw forbidden();
+      if (incident.status !== 'HandedOff') {
+        throw new ApiError(409, 'The EMS handoff must be complete before acknowledging receipt.', null);
+      }
+      const existing = incident.auditEvents.find(a => a.action === 'HandoffAcknowledged');
+      if (existing) return existing;
+      audit(incident, user, 'HandoffAcknowledged', `Report received by ${user.displayName}`);
+      saveState(state);
+      return incident.auditEvents[incident.auditEvents.length - 1];
+    }
+    // Demo tabs share one state document. Serialize receipt writes across tabs.
+    return globalThis.navigator?.locks
+      ? navigator.locks.request('pulselink-demo-receipts', recordReceipt)
+      : recordReceipt();
   },
 
   async exportHandoff(id: string): Promise<unknown> {

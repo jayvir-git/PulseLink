@@ -99,6 +99,9 @@ public class PulseLinkDbContext : IdentityDbContext<AppUser>
         builder.Entity<AuditEvent>(e =>
         {
             e.HasKey(x => x.Id);
+            e.HasIndex(x => x.IncidentId); // All incident history, including non-receipt events.
+            e.HasIndex(x => new { x.IncidentId, x.Action })
+                .IsUnique().HasFilter($"[IncidentId] IS NOT NULL AND [Action] = '{AuditEvent.ReceiptAction}'");
             e.Property(x => x.ActorUserId).HasMaxLength(450).IsRequired();
             e.Property(x => x.Action).HasMaxLength(100).IsRequired();
             e.Property(x => x.Details).HasMaxLength(2000).IsRequired();

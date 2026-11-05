@@ -1,0 +1,11 @@
+flowchart TB
+  accTitle: PulseLink — from field care to hospital receipt
+  accDescr: EMS creates a draft, records care and advances transport. The destination hospital sees incoming and arrived reports. EMS completes handoff, then hospital staff acknowledges report receipt separately from clinical responsibility.
+  A["Start incident · Draft"] --> B["En route → On scene<br/>Record observations, treatments and narrative"]
+  B --> C["Transporting<br/>Destination hospital required"]
+  C --> D["Arrived<br/>EMS handoff pending"]
+  D --> E["Handed off<br/>Clinical editing closes"]
+  C -.-> F["Hospital queue · Incoming"]
+  D -.-> G["Hospital queue · Arrived"]
+  E --> H["Awaiting acknowledgment<br/>Review the handoff report"]
+  H --> I["Acknowledged<br/>Report receipt confirmed"]

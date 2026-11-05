@@ -33,3 +33,7 @@ private/
 ## Load-test plan captures
 artifacts/
 frontend/dist-demo/
+
+## Documentation tools and isolated review workspaces
+docs/diagrams/node_modules/
+reports/interrogate-*/**/snapshot/

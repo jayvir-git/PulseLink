@@ -2,7 +2,10 @@ import type { IncidentDetail } from '../api/client';
 import { seedIncidents } from './fixture';
 
 const STORAGE_KEY = 'pulselink.demo.state';
-const SCHEMA = 1;
+// v2 changes intervention replay identity; old demo data is reseeded.
+const SCHEMA = 2;
+let memoryState: DemoState | undefined;
+let memoryOnly = false;
 
 export type ReplayRecord = {
   incidentId: string;
@@ -39,11 +42,13 @@ function freshState(): DemoState {
 // browser tabs see each other's writes. That is what makes the conflict and
 // retry behaviour observable without a server.
 export function loadState(): DemoState {
+  if (memoryOnly) return structuredClone(memoryState ??= freshState());
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
   } catch {
-    return freshState();
+    memoryOnly = true;
+    return structuredClone(memoryState ??= freshState());
   }
   if (!raw) {
     const seeded = freshState();
@@ -53,6 +58,7 @@ export function loadState(): DemoState {
   try {
     const parsed = JSON.parse(raw) as DemoState;
     if (parsed.schema !== SCHEMA || !Array.isArray(parsed.incidents)) throw new Error('stale shape');
+    memoryState = structuredClone(parsed);
     return parsed;
   } catch {
     const seeded = freshState();
@@ -62,10 +68,13 @@ export function loadState(): DemoState {
 }
 
 export function saveState(state: DemoState): void {
+  memoryState = structuredClone(state);
+  if (memoryOnly) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    /* A demo that cannot persist still works for the life of the page. */
+    // Stay in memory for this page so stale persisted data cannot undo a write.
+    memoryOnly = true;
   }
 }
 

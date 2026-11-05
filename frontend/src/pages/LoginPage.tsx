@@ -4,9 +4,9 @@ import { useAuth } from '../auth/AuthContext';
 import { IS_DEMO } from '../demo/config';
 
 const demos = [
-  { role: 'Paramedic', email: 'paramedic@pulselink.demo' },
-  { role: 'Hospital', email: 'hospital@pulselink.demo' },
-  { role: 'Admin', email: 'admin@pulselink.demo' },
+  { role: 'Paramedic', email: 'paramedic@pulselink.demo', description: 'Document observations and move a patient through transport.' },
+  { role: 'Hospital', email: 'hospital@pulselink.demo', description: 'Review incoming reports and acknowledge hospital receipt.' },
+  { role: 'Admin', email: 'admin@pulselink.demo', description: 'Explore incidents across agencies and hospital directories.' },
 ];
 
 export function LoginPage() {
@@ -32,15 +32,15 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-shell">
+    <main className="login-shell">
       <div className="login-panel">
         <Link className="login-back" to="/">← PulseLink home</Link>
         <p className="eyebrow">YOUR CARE WORKSPACE</p>
-        <h1>Welcome back.</h1>
+        <h1>{IS_DEMO ? 'Choose your perspective.' : 'Welcome back.'}</h1>
         <p className="lede">
-          Sign in to create field PCRs, advance transport status, and deliver structured hospital handoffs.
+          {IS_DEMO ? 'Explore the same handoff from the field and the receiving hospital. No account or password needed.' : 'Sign in to create field PCRs, advance transport status, and deliver structured hospital handoffs.'}
         </p>
-        <form onSubmit={onSubmit} className="stack">
+        {!IS_DEMO && <form onSubmit={onSubmit} className="stack">
           <label>
             Email
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="username" required />
@@ -55,32 +55,35 @@ export function LoginPage() {
               required
             />
           </label>
-          {error && <p className="error">{error}</p>}
           <button type="submit" disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
-        </form>
+        </form>}
+        {error && <p className="error" role="alert">{error}</p>}
         {IS_DEMO && <div className="demo-accounts">
-          <p>Pick a role to continue. No password, and no account is created.</p>
-          <div className="demo-row">
+          <div className="role-options">
             {demos.map((d) => (
               <button
                 key={d.email}
                 type="button"
-                className="ghost"
+                className="role-option ghost"
+                aria-label={`Continue as ${d.role}`}
                 disabled={loading}
                 onClick={() => {
                   setEmail(d.email);
                   setError('');
+                  setLoading(true);
                   login(d.email, 'demo').catch((err: unknown) => {
                     setError(err instanceof Error ? err.message : 'Sign in failed');
-                  });
+                  }).finally(() => setLoading(false));
                 }}
               >
-                Continue as {d.role}
+                <strong>Continue as {d.role}<span aria-hidden="true"> →</span></strong>
+                <span>{d.description}</span>
               </button>
             ))}
           </div>
+          <p role="status">{loading ? 'Opening workspace…' : 'Start as Paramedic, then switch roles to see the receiving team’s view. Demo changes stay in this browser.'}</p>
         </div>}
         {!IS_DEMO && import.meta.env.DEV && <div className="demo-accounts">
           <p>Demo accounts (password: Demo123!)</p>
@@ -93,6 +96,6 @@ export function LoginPage() {
           </div>
         </div>}
       </div>
-    </div>
+    </main>
   );
 }

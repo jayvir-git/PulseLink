@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
+import { IS_DEMO } from '../demo/config';
 
 export function LandingPage() {
   return (
     <div className="landing">
       <header className="landing-nav">
         <Link className="brand" to="/"><span className="brand-mark" aria-hidden="true" /><strong>PulseLink</strong></Link>
-        <nav aria-label="Main navigation"><a href="#workflow">How it works</a><Link className="button" to="/login">Sign in</Link></nav>
+        <nav aria-label="Main navigation"><a href="#workflow">How it works</a><Link className="button" to="/login">{IS_DEMO ? 'Try the demo' : 'Sign in'}</Link></nav>
       </header>
       <main>
         <section className="hero">
@@ -13,7 +14,7 @@ export function LandingPage() {
             <p className="eyebrow">FROM THE FIELD TO THE RECEIVING TEAM</p>
             <h1>One handoff.<br /><em>Every detail connected.</em></h1>
             <p className="hero-copy">Give the next care team the whole picture. Capture field observations, follow transport progress, and bring the clinical record together at arrival.</p>
-            <div className="hero-actions"><Link className="button" to="/login">Open your workspace <span aria-hidden="true">↗</span></Link><a href="#workflow">Explore the workflow ↓</a></div>
+            <div className="hero-actions"><Link className="button" to="/login">{IS_DEMO ? 'Try the interactive demo' : 'Open your workspace'} <span aria-hidden="true">↗</span></Link><a href="#workflow">Explore the workflow ↓</a></div>
             <p className="demo-note">Demonstration environment · Use fictional patient information only.</p>
           </div>
           <div className="handoff-preview" aria-label="Illustrative handoff preview">
@@ -33,7 +34,7 @@ export function LandingPage() {
           </div>
         </section>
       </main>
-      <footer className="landing-footer"><strong>PulseLink</strong><span>EMS → hospital care continuity</span><Link to="/login">Sign in to your workspace →</Link></footer>
+      <footer className="landing-footer"><strong>PulseLink</strong><span>EMS → hospital care continuity</span><Link to="/login">{IS_DEMO ? 'Choose a demo role →' : 'Sign in to your workspace →'}</Link></footer>
     </div>
   );
 }

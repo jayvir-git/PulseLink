@@ -123,6 +123,7 @@ internal sealed class IncidentApiFactory : WebApplicationFactory<Program>
                 ["paramedic-a"] = Claims("paramedic-a", AppRoles.Paramedic, "agencyId", AgencyA.ToString()),
                 ["paramedic-b"] = Claims("paramedic-b", AppRoles.Paramedic, "agencyId", AgencyB.ToString()),
                 ["hospital-a"] = Claims("hospital-a", AppRoles.HospitalStaff, "hospitalId", HospitalA.ToString()),
+                ["hospital-colleague"] = Claims("hospital-colleague", AppRoles.HospitalStaff, "hospitalId", HospitalA.ToString()),
                 ["hospital-b"] = Claims("hospital-b", AppRoles.HospitalStaff, "hospitalId", HospitalB.ToString()),
                 ["hospital-missing"] = Claims("hospital-missing", AppRoles.HospitalStaff),
                 ["hospital-invalid"] = Claims("hospital-invalid", AppRoles.HospitalStaff, "hospitalId", "invalid"),

@@ -1,5 +1,5 @@
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { AdminPage } from './pages/AdminPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -7,14 +7,18 @@ import { IncidentDetailPage } from './pages/IncidentDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { NewIncidentPage } from './pages/NewIncidentPage';
+import { IS_DEMO } from './demo/config';
+import { readableLabel } from './ui';
 
 function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#workspace">Skip to workspace</a>
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" />
+          <span className="brand-mark" aria-hidden="true" />
           <div>
             <strong>PulseLink</strong>
             <small>Care continuity</small>
@@ -22,22 +26,26 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
         {user && (
           <div className="topbar-right">
-            <nav>
+            <nav aria-label="Workspace">
               <Link to="/">Incidents</Link>
               {user.role === 'Admin' && <Link to="/admin">Admin</Link>}
             </nav>
             <div className="user-chip">
-              <span>
-                {user.displayName} · {user.role}
+              <span className="user-identity">
+                <span className="user-name">{user.displayName}</span>
+                <span className="user-role">{readableLabel(user.role)}</span>
               </span>
-              <button type="button" className="ghost" onClick={logout}>
-                Sign out
+              <button type="button" className="ghost" onClick={() => {
+                logout();
+                if (IS_DEMO) navigate('/login', { replace: true });
+              }}>
+                {IS_DEMO ? 'Switch role' : 'Sign out'}
               </button>
             </div>
           </div>
         )}
       </header>
-      <main>{children}</main>
+      <main id="workspace" tabIndex={-1}>{children}</main>
     </div>
   );
 }
@@ -50,6 +58,12 @@ function Protected({ children }: { children: ReactNode }) {
 
 export default function App() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (main) { main.tabIndex = -1; main.focus({ preventScroll: true }); }
+    window.scrollTo(0, 0);
+  }, [pathname, user?.role]);
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

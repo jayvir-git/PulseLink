@@ -7,14 +7,14 @@ public record CreateIncidentRequest(
     [Required, MaxLength(500)] string ChiefComplaint,
     string? PatientAgeRange,
     string? PatientSex,
-    string? Notes,
+    [MaxLength(2000)] string? Notes,
     Guid? DestinationHospitalId);
 
 public record UpdateIncidentRequest(
     [Required, MaxLength(500)] string ChiefComplaint,
     string? PatientAgeRange,
     string? PatientSex,
-    string? Notes,
+    [MaxLength(2000)] string? Notes,
     Guid? DestinationHospitalId);
 
 public record AddVitalRequest(
@@ -72,13 +72,17 @@ public record IncidentSummaryDto(
     string AgencyName,
     string? DestinationHospitalName,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool ReceiptAcknowledged = false);
 
 public record PagedIncidentListDto(
     IReadOnlyList<IncidentSummaryDto> Items,
     int Page,
     int PageSize,
-    int TotalCount);
+    int TotalCount,
+    HospitalQueueCountsDto? QueueCounts = null);
+
+public record HospitalQueueCountsDto(int Incoming, int Arrived, int Awaiting, int Received);
 
 public record IncidentDetailDto(
     Guid Id,

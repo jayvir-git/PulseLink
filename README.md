@@ -16,6 +16,13 @@ This build has **no server and no database**. It swaps the HTTP client for an in
 
 Run it locally with `npm run dev:demo` in `frontend`, or build it with `npm run build:demo`.
 
+The adapter demonstrates the workflow; it is not a replacement for API contract
+tests. CI checks demo status rules, intervention replay identity, and incident
+storage fallback. When incident storage fails, changes remain in memory for that
+page only; reloads and other tabs cannot share those changes. Authentication still
+requires browser storage. Demo storage schema changes reset synthetic incidents;
+schema 2 resets older data to update intervention replay identity.
+
 ### Hosted deployment
 
 **[pulselink.jayvir.dev](https://pulselink.jayvir.dev)**
@@ -27,6 +34,20 @@ The landing page and the sign-in screen are public. **The clinical workspace req
 It runs on free tiers, so the first request after an idle period can take up to a minute while the app and its database resume; later requests are fast. Free quotas can interrupt it.
 
 Use fictional patient information only. Deployment and configuration: [docs/azure.md](docs/azure.md).
+
+## Care continuity at a glance
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/workflow-dark.svg">
+  <img src="docs/images/workflow-light.svg" alt="EMS documents care through transport and arrival. Handoff closes clinical editing; the receiving hospital separately acknowledges report receipt.">
+</picture>
+
+Rendered with [Pele](https://pele.run/) using PulseLink's green palette. [Diagram source and regeneration](docs/diagrams/README.md).
+
+- **In the field:** start with the presenting complaint, choose a destination before transport, and record repeated observation sets, treatments, and an evolving care narrative.
+- **At the hospital:** scan Incoming, Arrived, Awaiting acknowledgment, and Acknowledged queues; review the latest observation set, treatment details, and EMS narrative.
+- **At handoff:** clinical editing closes. Hospital acknowledgment records who received the report and when; it does not represent transfer of clinical responsibility.
+- **When work conflicts:** version checks require a deliberate reload and review. Unsaved clinical entries remain visible after a concurrent handoff, and uncertain treatment retries reuse the original request identity.
 
 ## Stack
 
@@ -42,7 +63,7 @@ Use fictional patient information only. Deployment and configuration: [docs/azur
 ### Prerequisites
 
 - .NET 8 SDK
-- Node.js 20+
+- Node.js 22.12+
 
 ### API
 
@@ -94,7 +115,18 @@ dotnet run --launch-profile http-sqlserver
 dotnet test PulseLink.sln
 ```
 
-List ordering is also run against SQL Server LocalDB when it is present. Those facts skip in CI (Ubuntu has no LocalDB).
+The backend suite covers state transitions, role visibility, concurrent edits, receipt races, and narrative validation against SQLite and SQL Server. LocalDB tests skip when unavailable locally; the Windows CI job requires LocalDB, while Ubuntu runs SQLite.
+
+```bash
+cd frontend
+npm ci
+npm run build
+npm run test:browser
+npm run test:demo:browser
+node --test tests/demo-*.test.mjs
+```
+
+Install Chromium once with `npx playwright install chromium` before browser checks. See [testing details](docs/testing.md).
 
 ## Seeded local users
 
@@ -112,17 +144,20 @@ See [docs/demo-walkthrough.md](docs/demo-walkthrough.md) for a guided local walk
 | --- | --- |
 | ![Login](docs/images/login.png) | ![Paramedic incidents](docs/images/paramedic-incidents.png) |
 
-| Incident detail + export | Hospital handoffs |
+| Field care record | Hospital receiving queue |
 | --- | --- |
-| ![Incident detail](docs/images/incident-detail.png) | ![Hospital handoffs](docs/images/hospital-handoffs.png) |
+| ![Field care record](docs/images/field-care.png) | ![Hospital receiving queue](docs/images/receiving-queue.png) |
 
 ## Core workflow
 
-1. Paramedic creates a draft incident (chief complaint, destination hospital)
-2. Records vitals and interventions as normalized rows
-3. Advances status: `Draft → EnRoute → OnScene → Transporting → Arrived → HandedOff`
-4. Hospital staff reviews the handoff for their facility
-5. Authorized users can generate a FHIR-inspired export via `GET /api/incidents/{id}/export`
+1. Create a draft incident with a chief complaint; destination can be chosen later.
+2. Add repeated vitals and interventions, and update care notes (up to 2,000 characters). Recorded timestamps are entry times, not verified care times.
+3. Advance `Draft → EnRoute → OnScene → Transporting → Arrived → HandedOff`. A destination is required before transport.
+4. The destination hospital sees transporting and arrived patients and reviews the structured handoff.
+5. After EMS completes handoff, hospital staff acknowledges report receipt. The original receipt remains unchanged on retry.
+6. Authorized users can generate a FHIR-inspired JSON bundle via `GET /api/incidents/{id}/export`.
+
+Unsaved entries are not persisted across navigation or reload. Over-limit narratives remain in the editor for shortening; the API and browser demo reject them without truncation. The export is a bounded integration example, not a complete EHR or certified FHIR interface.
 
 ## Project layout
 
@@ -142,7 +177,7 @@ PulseLink/
 - Explicit incident status state machine with hospital-required gates
 - Relational vitals/interventions (not a single JSON blob)
 - Role-scoped queries (agency vs destination hospital)
-- Audit events on create/update/status/export
+- Audit events on create/update/status/export and hospital receipt
 - Integration stub export for hospital systems
 
 More detail: [docs/architecture.md](docs/architecture.md). List query indexes: [docs/performance.md](docs/performance.md).

@@ -46,9 +46,9 @@ jobs:
       - name: Test Cloudflare proxy
         run: node --test infra/cloudflare/worker.test.mjs
 
-      - name: Demo status machine matches the server
+      - name: Demo contracts and status machine
         working-directory: frontend
-        run: node --test tests/demo-status-machine.test.mjs
+        run: node --test tests/demo-*.test.mjs
 
       - name: Build frontend
         working-directory: frontend

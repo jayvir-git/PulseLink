@@ -89,7 +89,7 @@ export async function runLiveBrowser({ apiOrigin, call, token, hospitalId }) {
     await a.getByText('Intervention recorded. Adding again will create a separate intervention.', { exact: true }).waitFor();
     assert.equal(requests.length, 2);
     assert.deepEqual(requests[1], requests[0]);
-    await a.getByRole('button', { name: 'Mark HandedOff' }).click();
+    await a.getByRole('button', { name: 'Mark Handed Off' }).click();
     await a.locator('.status-handedoff').waitFor();
     await b.getByRole('button', { name: 'Add vitals', exact: true }).click();
     await b.getByRole('button', { name: 'Reload latest incident' }).click();

@@ -198,6 +198,7 @@ test('Vitals conflict keeps input, requires reload, then uses the refreshed vers
   try {
     const heartRate = s.page.getByLabel('Heart rate (bpm)', { exact: true });
     await heartRate.fill('123');
+    await s.page.getByText('Handoff export', { exact: true }).click();
     await s.page.getByRole('button', { name: 'Generate FHIR-like JSON' }).click();
     await s.page.locator('pre.export').waitFor();
     assert.equal(s.reads(), 1, 'Export must not silently refresh the form version');
@@ -242,10 +243,12 @@ for (const failureMode of ['lost', 'busy']) {
       assert.equal(s.writes.length, 1);
       assert.match(s.writes[0].key, /^[0-9a-f-]{36}$/);
       await s.page.getByRole('button', { name: 'Retry same intervention' }).click();
-      await s.page.getByText('Intervention recorded. Adding again will create a separate intervention.').waitFor();
+      await s.page.getByText('Intervention recorded. The form is ready for the next treatment.').waitFor();
       await s.page.locator('fieldset:enabled').first().waitFor();
       assert.equal(s.writes.length, 2);
       assert.deepEqual(s.writes[1], s.writes[0], 'Retry must preserve key, payload and original If-Match');
+      assert.equal(await name.inputValue(), '', 'Confirmed success clears the form for a new treatment');
+      await name.fill('Synthetic intended intervention');
       const savedAgain = s.page.waitForResponse(response => response.url().endsWith('/interventions') && response.status() === 200);
       await submit.click();
       await savedAgain;
@@ -269,7 +272,7 @@ test('Handoff conflict preserves intervention input and prevents further clinica
     await s.page.getByRole('alert').waitFor();
     assert.equal(await name.inputValue(), 'Unsaved synthetic intervention');
     await s.page.getByRole('button', { name: 'Reload latest incident' }).click();
-    await s.page.getByRole('status').waitFor();
+    await s.page.getByRole('status').filter({ hasText: 'Latest incident loaded.' }).waitFor();
     assert.equal(await name.inputValue(), 'Unsaved synthetic intervention');
     assert.equal(await name.isDisabled(), true);
     assert.equal(await s.page.getByRole('button', { name: 'Add intervention', exact: true }).isDisabled(), true);
@@ -286,14 +289,14 @@ test('Handoff conflict preserves intervention input and prevents further clinica
 test('Status conflict uses the same reload-and-review flow', { timeout: 30000 }, async () => {
   const s = await scenario('Arrived', 'status');
   try {
-    await s.page.getByRole('button', { name: 'Mark HandedOff' }).click();
+    await s.page.getByRole('button', { name: 'Mark Handed Off' }).click();
     s.release();
     await s.page.getByRole('alert').waitFor();
-    assert.equal(await s.page.getByRole('button', { name: 'Mark HandedOff' }).isDisabled(), true);
+    assert.equal(await s.page.getByRole('button', { name: 'Mark Handed Off' }).isDisabled(), true);
     assert.equal(s.writes[0].version, `"${versionA}"`);
     await s.page.getByRole('button', { name: 'Reload latest incident' }).click();
     await s.page.getByRole('status').waitFor();
-    await s.page.getByRole('button', { name: 'Mark HandedOff' }).click();
+    await s.page.getByRole('button', { name: 'Mark Handed Off' }).click();
     await s.page.locator('.status-handedoff').waitFor();
     assert.equal(s.writes.length, 2);
     assert.equal(s.writes[1].version, `"${versionB}"`);
@@ -332,5 +335,286 @@ test('Public landing leads to sign in and fits a narrow screen', async () => {
     await page.getByRole('link', { name: 'Open your workspace' }).click();
     assert.equal(await page.getByLabel('Email', { exact: true }).inputValue(), '');
     assert.equal(await page.getByLabel('Password', { exact: true }).inputValue(), '');
+  } finally { await context.close(); }
+});
+
+test('Destination update uses reviewed version, preserves choice on conflict, and unlocks transport', async () => {
+  let current = { ...incident(versionA, 'OnScene'), destinationHospitalId: null, destinationHospitalName: null, allowedNextStatuses: ['Transporting'] };
+  const writes = [];
+  const { context, page } = await listScenario(async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/hospitals')) return route.fulfill({ json: [{ id, name: 'Test hospital', city: 'Test city' }] });
+    if (request.method() === 'PUT') {
+      writes.push({ version: request.headers()['if-match'], body: request.postDataJSON() });
+      if (writes.length === 1) {
+        current = { ...current, version: versionB, notes: 'Newer server note' };
+        return route.fulfill({ status: 412, json: { code: 'incident_conflict', message: 'Changed elsewhere' } });
+      }
+      current = { ...current, ...request.postDataJSON(), destinationHospitalName: 'Test hospital', version: versionC };
+      return route.fulfill({ json: current });
+    }
+    return route.fulfill({ json: path === `/api/incidents/${id}` ? current : { page: 1, pageSize: 50, totalCount: 1, items: [current] } });
+  });
+  try {
+    await page.goto(`${origin}/incidents/${id}`);
+    assert.equal(await page.getByRole('button', { name: 'Mark Transporting' }).isDisabled(), true);
+    await page.getByRole('button', { name: 'Choose destination' }).click();
+    await page.getByRole('combobox').selectOption(id);
+    await page.getByRole('button', { name: 'Save destination' }).click();
+    await page.getByRole('button', { name: 'Reload latest incident' }).waitFor();
+    assert.equal(await page.getByRole('combobox').inputValue(), id);
+    await page.getByRole('button', { name: 'Reload latest incident' }).click();
+    await page.getByText('Newer server note', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Save destination' }).click();
+    await page.getByText('Destination saved.', { exact: false }).waitFor();
+    assert.equal(writes[0].version, `"${versionA}"`);
+    assert.equal(writes[1].version, `"${versionB}"`);
+    assert.equal(writes[1].body.notes, 'Newer server note');
+    assert.equal(await page.getByRole('button', { name: 'Mark Transporting' }).isEnabled(), true);
+  } finally { await context.close(); }
+});
+
+test('Initial detail failure offers announced error and retry', async () => {
+  let reads = 0;
+  const { context, page } = await listScenario(async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === `/api/incidents/${id}`) {
+      reads++;
+      return route.fulfill(reads === 1 ? { status: 503, json: { message: 'Temporary incident failure' } } : { json: incident() });
+    }
+    return route.fulfill({ json: { page: 1, pageSize: 50, totalCount: 0, items: [] } });
+  });
+  try {
+    await page.goto(`${origin}/incidents/${id}`);
+    await page.getByRole('alert').filter({ hasText: 'Temporary incident failure' }).waitFor();
+    assert.equal(await page.getByRole('link', { name: 'Back to list', exact: false }).count(), 1);
+    await page.getByRole('button', { name: 'Retry incident' }).click();
+    await page.getByRole('heading', { name: 'Synthetic conflict test' }).waitFor();
+    assert.equal(reads, 2);
+  } finally { await context.close(); }
+});
+
+async function hospitalScenario(handler, viewport = { width: 1440, height: 900 }) {
+  const context = await browser.newContext({ viewport });
+  await context.addInitScript(hospitalId => localStorage.setItem('pulselink.auth', JSON.stringify({
+    token: 'synthetic', email: 'hospital@example.invalid', displayName: 'Receiving nurse', role: 'HospitalStaff', hospitalId,
+  })), id);
+  await context.route('**/api/**', handler);
+  const page = await context.newPage();
+  page.setDefaultTimeout(5000);
+  await page.goto(`${origin}/incidents/${id}`);
+  return { context, page };
+}
+
+test('Hospital report keeps latest observation set distinct and exposes treatment notes', async () => {
+  const report = { ...incident(versionA, 'Transporting'), notes: 'Synthetic EMS narrative',
+    vitalSigns: [
+      { id: 'older', recordedAt: '2026-09-15T12:00:00Z', heartRate: 88, systolicBp: 128, diastolicBp: 78 },
+      { id: 'newer', recordedAt: '2026-09-15T12:10:00Z', heartRate: 101, temperatureC: 0 },
+    ],
+    interventions: [{ id: 'treatment', name: 'Synthetic intervention', performedAt: '2026-09-15T12:05:00Z', medication: 'Synthetic medication', dose: 'Test dose', route: 'Test route', notes: 'Recorded response from EMS' }],
+  };
+  const { context, page } = await hospitalScenario(route => route.fulfill({ json: report }), { width: 390, height: 844 });
+  try {
+    await page.getByRole('heading', { name: 'Latest observations' }).waitFor();
+    const metrics = page.locator('.observation-grid');
+    assert.match(await metrics.innerText(), /101/);
+    assert.doesNotMatch(await metrics.innerText(), /128|78|88/);
+    assert.match(await metrics.innerText(), /Blood pressure\s+Not recorded/);
+    assert.match(await metrics.innerText(), /Temperature\s+0/);
+    await page.getByText('All observation sets (2)', { exact: true }).click();
+    assert.match(await page.getByRole('region', { name: /Observation history/ }).innerText(), /128 \/ 78/);
+    assert.equal(await page.getByText('Recorded response from EMS', { exact: false }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Acknowledge receipt' }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Add vitals' }).count(), 0);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  } finally { await context.close(); }
+});
+
+test('Hospital receipt retry shows original receiver and survives refresh', async () => {
+  const report = incident(versionA, 'HandedOff');
+  const receipt = { id: 'receipt', actorUserId: 'nurse', action: 'HandoffAcknowledged', details: 'Report received by Receiving nurse', createdAt: '2026-09-15T12:30:00Z' };
+  let writes = 0;
+  const { context, page } = await hospitalScenario(route => {
+    if (route.request().method() === 'PUT') {
+      writes++;
+      report.auditEvents = [receipt]; // First response is lost after commit.
+      return writes === 1 ? route.abort('failed') : route.fulfill({ json: receipt });
+    }
+    return route.fulfill({ json: report });
+  });
+  try {
+    await page.getByRole('button', { name: 'Acknowledge receipt', exact: true }).click();
+    await page.getByRole('alert').waitFor();
+    await page.getByRole('button', { name: 'Acknowledge receipt', exact: true }).click();
+    await page.getByText('Receipt acknowledged', { exact: true }).waitFor();
+    assert.equal(writes, 2);
+    assert.equal(await page.getByRole('button', { name: 'Acknowledge receipt' }).count(), 0);
+    await page.getByRole('button', { name: 'Refresh report' }).click();
+    await page.getByText('Report refreshed.', { exact: true }).waitFor();
+    assert.match(await page.locator('#report-receipt').innerText(), /Report received by Receiving nurse/);
+    assert.equal(await page.locator('#report-receipt time').getAttribute('datetime'), receipt.createdAt);
+  } finally { await context.close(); }
+});
+
+test('Hospital refresh failure explicitly identifies the retained snapshot', async () => {
+  let reads = 0;
+  const { context, page } = await hospitalScenario(route => {
+    if (new URL(route.request().url()).pathname.endsWith('/export')) return route.fulfill({ json: { resourceType: 'Bundle', entry: [] } });
+    reads++;
+    return route.fulfill(reads === 1 ? { json: incident() } : { status: 503, json: { message: 'Synthetic connection failure' } });
+  });
+  try {
+    await page.getByRole('heading', { name: 'Synthetic conflict test' }).waitFor();
+    await page.getByRole('button', { name: 'Refresh report' }).click();
+    await page.getByRole('alert').filter({ hasText: 'Showing the previously loaded report' }).waitFor();
+    assert.equal(await page.getByText('Report refreshed.', { exact: true }).count(), 0);
+    assert.equal(await page.getByRole('heading', { name: 'Synthetic conflict test' }).count(), 1);
+    await page.getByText('Structured export', { exact: true }).click();
+    await page.getByRole('button', { name: 'Generate FHIR-like JSON' }).click();
+    await page.getByLabel('Exported report JSON').waitFor();
+    assert.equal(await page.getByRole('alert').filter({ hasText: 'Showing the previously loaded report' }).count(), 1);
+  } finally { await context.close(); }
+});
+
+
+test('Unsaved clinical entries prevent handoff until deliberately cleared', async () => {
+  const s = await scenario('Arrived', 'status');
+  try {
+    for (const [label, value, clear] of [
+      ['Heart rate (bpm)', '88', 'Clear observation inputs'],
+      ['Intervention notes', 'Response pending', 'Clear treatment inputs'],
+      ['EMS narrative', 'New assessment', 'Discard note changes'],
+    ]) {
+      await s.page.getByLabel(label, { exact: true }).fill(value);
+      await s.page.getByRole('button', { name: 'Mark Handed Off' }).click();
+      await s.page.getByRole('alert').filter({ hasText: 'Save or clear your unsaved entries' }).waitFor();
+      assert.equal(s.writes.length, 0);
+      assert.equal(await s.page.getByLabel(label, { exact: true }).inputValue(), value);
+      await s.page.getByRole('button', { name: clear, exact: true }).click();
+    }
+  } finally { s.release(); await s.context.close(); }
+});
+
+test('Care notes preserve a conflicting draft, show saved comparison, and retry with reviewed version', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => localStorage.setItem('pulselink.auth', JSON.stringify({ token: 'synthetic', role: 'Paramedic', displayName: 'Test paramedic', email: 'test@example.invalid' })));
+  let reads = 0;
+  const writes = [];
+  await context.route('**/api/**', async route => {
+    const req = route.request();
+    if (req.method() === 'GET') {
+      reads++;
+      return route.fulfill({ json: { ...incident(), version: reads === 1 ? versionA : versionB, notes: reads === 1 ? 'Original narrative' : 'Other clinician update' } });
+    }
+    writes.push({ body: req.postDataJSON(), version: req.headers()['if-match'] });
+    if (writes.length === 1) return route.fulfill({ status: 412, json: { message: 'Changed elsewhere' } });
+    return route.fulfill({ json: { ...incident(), version: versionC, notes: req.postDataJSON().notes } });
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${origin}/incidents/${id}`);
+    const notes = page.getByLabel('EMS narrative', { exact: true });
+    await notes.fill('Assessment and response documented');
+    await page.getByRole('button', { name: 'Save care notes', exact: true }).click();
+    await page.getByRole('button', { name: 'Reload latest incident' }).click();
+    await page.getByRole('status').filter({ hasText: 'Latest incident loaded' }).waitFor();
+    assert.equal(await notes.inputValue(), 'Assessment and response documented');
+    await page.getByText('Compare with saved care notes', { exact: true }).click();
+    await page.getByText('Other clinician update', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Save care notes', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Care notes saved' }).waitFor();
+    assert.equal(writes.length, 2);
+    assert.equal(writes[1].version, `"${versionB}"`);
+    assert.equal(writes[1].body.notes, 'Assessment and response documented');
+    assert.equal(await page.getByRole('button', { name: 'Save care notes', exact: true }).isDisabled(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  } finally { await context.close(); }
+});
+
+test('Successful intervention replay after handoff must keep other unsaved clinical drafts visible', async () => {
+  let current = incident();
+  const writes = [];
+  const { context, page } = await listScenario(async route => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname;
+    if (req.method() === 'POST' && path.endsWith('/interventions')) {
+      writes.push({ key: req.headers()['idempotency-key'], body: req.postDataJSON() });
+      if (writes.length === 1) {
+        // Treatment commits; another paramedic subsequently hands off the record.
+        // Both are permitted before the client's explicit idempotent replay.
+        current = { ...incident(versionC, 'HandedOff'), interventions: [{ id: 'treatment', name: req.postDataJSON().name, performedAt: '2026-09-15T12:01:00Z' }] };
+        return route.abort('failed');
+      }
+      return route.fulfill({ json: { incidentId: id, interventionId: 'treatment', performedAt: '2026-09-15T12:01:00Z' } });
+    }
+    return route.fulfill({ json: path === `/api/incidents/${id}` ? current : { page: 1, pageSize: 50, totalCount: 1, items: [current] } });
+  });
+  try {
+    await page.goto(`${origin}/incidents/${id}`);
+    await page.getByLabel('Heart rate (bpm)', { exact: true }).fill('91');
+    await page.getByLabel('EMS narrative', { exact: true }).fill('Unsaved assessment for verbal handoff');
+    await page.getByLabel('Intervention name', { exact: true }).fill('Synthetic treatment');
+    await page.getByRole('button', { name: 'Add intervention', exact: true }).click();
+    await page.getByRole('button', { name: 'Retry same intervention' }).waitFor();
+    assert.equal(await page.getByLabel('Heart rate (bpm)', { exact: true }).inputValue(), '91');
+    await page.getByRole('button', { name: 'Retry same intervention' }).click();
+    await page.getByRole('button', { name: 'Refresh report', exact: true }).waitFor();
+    const evidence = {
+      retryRequests: writes.length,
+      sameKey: writes[0].key === writes[1].key,
+      savedTreatmentVisible: await page.getByText('Synthetic treatment', { exact: true }).count(),
+      unsavedStateBanner: await page.locator('.field-save-state').innerText(),
+      heartRateInputs: await page.getByLabel('Heart rate (bpm)', { exact: true }).count(),
+      narrativeInputs: await page.getByLabel('EMS narrative', { exact: true }).count(),
+      unsavedNarrativeVisible: await page.getByText('Unsaved assessment for verbal handoff', { exact: true }).count(),
+      retainedInputsWarning: await page.getByText('This incident has been handed off. Your retained inputs cannot be submitted.', { exact: true }).count(),
+    };
+    assert.equal(evidence.sameKey, true);
+    assert.equal(evidence.savedTreatmentVisible, 1);
+    assert.equal(evidence.retainedInputsWarning, 1);
+    assert.equal(await page.getByLabel('Heart rate (bpm)', { exact: true }).inputValue(), '91');
+    assert.equal(await page.getByLabel('EMS narrative', { exact: true }).inputValue(), 'Unsaved assessment for verbal handoff');
+    assert.equal(await page.getByLabel('Heart rate (bpm)', { exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Save care notes', exact: true }).isDisabled(), true);
+    assert.equal(evidence.heartRateInputs, 1, 'Retained vitals must remain visible after replay refresh observes handoff');
+    assert.equal(evidence.narrativeInputs, 1, 'Retained narrative must remain visible after handoff');
+  } finally { await context.close(); }
+});
+
+
+test('Narrative limit preserves over-limit text and allows saving after shortening', async () => {
+  let writes = 0;
+  const { context, page } = await listScenario(async route => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname;
+    if (path === '/api/lookup/hospitals') return route.fulfill({ json: [] });
+    if (req.method() === 'PUT') {
+      writes++;
+      return route.fulfill({ json: { ...incident(versionB), notes: req.postDataJSON().notes } });
+    }
+    return route.fulfill({ json: path === `/api/incidents/${id}` ? incident() : { page: 1, pageSize: 50, totalCount: 1, items: [incident()] } });
+  });
+  try {
+    await page.goto(`${origin}/incidents/${id}`);
+    const notes = page.getByLabel('EMS narrative', { exact: true });
+    await notes.fill('n'.repeat(2001));
+    assert.equal((await notes.inputValue()).length, 2001);
+    assert.equal(await notes.getAttribute('aria-invalid'), 'true');
+    assert.equal(await page.getByRole('button', { name: 'Save care notes', exact: true }).isDisabled(), true);
+    assert.equal(writes, 0);
+    await notes.fill('n'.repeat(2000));
+    await page.getByRole('button', { name: 'Save care notes', exact: true }).click();
+    await page.getByText('Care notes saved. The receiving team sees this narrative with the report.', { exact: true }).waitFor();
+    assert.equal(writes, 1);
+    assert.equal((await notes.inputValue()).length, 2000);
+    await page.goto(`${origin}/incidents/new`);
+    const initial = page.getByLabel('Initial care notes (optional)', { exact: true });
+    await initial.fill('n'.repeat(2001));
+    assert.equal((await initial.inputValue()).length, 2001);
+    assert.equal(await page.getByRole('button', { name: 'Create draft', exact: true }).isDisabled(), true);
+    await initial.fill('n'.repeat(2000));
+    assert.equal(await page.getByRole('button', { name: 'Create draft', exact: true }).isDisabled(), false);
   } finally { await context.close(); }
 });

@@ -2,6 +2,7 @@ namespace PulseLink.Core.Entities;
 
 public class AuditEvent
 {
+    public const string ReceiptAction = "HandoffAcknowledged";
     public Guid Id { get; set; }
     public Guid? IncidentId { get; set; }
     public Incident? Incident { get; set; }

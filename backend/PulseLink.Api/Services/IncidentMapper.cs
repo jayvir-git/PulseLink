@@ -15,7 +15,8 @@ public static class IncidentMapper
             incident.Agency.Name,
             incident.DestinationHospital?.Name,
             incident.CreatedAt,
-            incident.UpdatedAt);
+            incident.UpdatedAt,
+            incident.AuditEvents.Any(a => a.Action == AuditEvent.ReceiptAction));
 
     public static IncidentDetailDto ToDetail(Incident incident) =>
         new(
