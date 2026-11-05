@@ -1,0 +1,1 @@
+{"name":"pulselink-doc-diagrams","private":true,"type":"module","scripts":{"build":"node render.mjs"},"devDependencies":{"pele":"1.13.0"}}

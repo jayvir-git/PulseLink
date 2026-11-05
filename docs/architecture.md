@@ -49,6 +49,8 @@ Changing to another existing hospital is allowed before handoff, including durin
 transport and after arrival; this preserves the existing destination-edit policy.
 Hospital visibility follows the new destination immediately.
 
+Incident care notes are limited to 2,000 characters on create and update. The API returns field validation (400) above that limit on both providers. The field forms show the limit and retain over-limit text for editing instead of truncating it; the browser demo enforces the same limit.
+
 Create and update requests with a nonexistent destination hospital return **400**
 with `message: "Destination hospital does not exist."`. Clearing a required
 destination also returns **400**, using the state machine's destination-required
@@ -178,6 +180,28 @@ authentication limitations are described in [testing.md](testing.md).
 
 Every create/update/status/export writes an `AuditEvent`.
 
+## Hospital acknowledgment
+
+After EMS marks an incident HandedOff, a staff member at the destination hospital
+can confirm receipt of the report. `PUT /api/incidents/{id}/receipt` takes no
+body. The server records its UTC time and the signed-in staff identity. Receipt
+confirms delivery of the report; it makes no claim about transfer of clinical responsibility.
+Visible incidents still in transport or arrived return 409. Standard role and
+incident visibility checks precede any receipt lookup, including on retries.
+
+The receipt is the HandoffAcknowledged audit event. A filtered unique index
+permits one per incident and leaves other events repeatable. Competing inserts
+return the winning receipt, including its original actor and timestamp. The
+incident ID identifies the receipt, so retries need neither a client-generated
+key nor a clinical version. The clinical record stays closed. Apply the matching
+HandoffReceipt migration before deploying the API.
+
+The browser demo stores the same receipt event in its existing audit array, so
+older demo records require no reset. Web Locks serialize competing receipt
+requests between tabs on supported browsers. Without Web Locks, only same-page
+operations are serialized; unavailable browser storage also limits persistence
+to the current page. The database tests establish the real API concurrency guarantee.
+
 ## Integration surface
 
 `GET /api/incidents/{id}/export` returns a FHIR-inspired JSON Bundle (Encounter, Condition, Observation, Procedure). This is intentionally a stub adapter pattern for hospital system integration—not a full FHIR server.
@@ -202,3 +226,18 @@ Local SQLite (default):
 ```
 
 Local SQL Server (Docker) and Azure SQL examples: [database.md](database.md).
+
+## Hospital receiving queues
+
+The paged incident endpoint accepts `queue=all|incoming|arrived|awaiting|received`.
+Role scoping is applied before queue filtering, counting, and pagination. Incoming
+means Transporting; Arrived remains distinct from completed EMS handoff. Awaiting
+means HandedOff without a HandoffAcknowledged audit event; Received means HandedOff
+with that event. Receipt confirms report delivery, not clinical responsibility.
+
+List rows expose `receiptAcknowledged`. Hospital responses also include
+`queueCounts` across the full visible hospital scope, independent of the selected
+queue and page. The list remains ordered by report update time; receipt itself
+does not change clinical update time. Dashboard refresh is explicit, and failed
+refreshes do not display old counts as current. The demo adapter follows the same
+queue definitions and receipt rules.

@@ -1,5 +1,6 @@
+import { NARRATIVE_LIMIT } from '../api/limits';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 export function NewIncidentPage() {
@@ -12,16 +13,21 @@ export function NewIncidentPage() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lookupError, setLookupError] = useState('');
+  const [lookupAttempt, setLookupAttempt] = useState(0);
 
   useEffect(() => {
+    let active = true;
+    setLookupError('');
     api.hospitals().then((list) => {
-      setHospitals(list);
-      if (list[0]) setDestinationHospitalId(list[0].id);
-    }).catch(err => setError(err instanceof Error ? err.message : 'Could not load hospitals'));
-  }, []);
+      if (active) setHospitals(list);
+    }).catch(err => { if (active) setLookupError(err instanceof Error ? err.message : 'Could not load hospitals'); });
+    return () => { active = false; };
+  }, [lookupAttempt]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading || notes.length > NARRATIVE_LIMIT) return;
     setLoading(true);
     setError('');
     try {
@@ -41,13 +47,16 @@ export function NewIncidentPage() {
   }
 
   return (
-    <section className="page narrow">
-      <p className="eyebrow">Paramedic</p>
-      <h1>New PCR incident</h1>
-      <form className="stack card-form" onSubmit={onSubmit}>
+    <section className="page narrow receiving-report field-report">
+      <div className="report-toolbar"><Link to="/">← Back to list</Link></div>
+      <header className="report-heading"><p className="report-kicker">FIELD CARE RECORD</p><h1>Start an incident</h1><p className="report-caption">Start with the presenting complaint. Add observations, treatments and care notes as the incident develops.</p></header>
+      <form className="stack report-section" onSubmit={onSubmit}>
+        <p className="report-caption">Chief complaint is required. Other details can be left unrecorded.</p>
+        <fieldset className="stack new-incident-fields" disabled={loading}>
         <label>
           Chief complaint
           <input
+            autoFocus
             value={chiefComplaint}
             onChange={(e) => setChiefComplaint(e.target.value)}
             required
@@ -61,7 +70,7 @@ export function NewIncidentPage() {
           </label>
           <label>
             Sex
-            <select value={patientSex} onChange={(e) => setPatientSex(e.target.value)}>
+            <select aria-label="Sex" value={patientSex} onChange={(e) => setPatientSex(e.target.value)}>
               <option>Unknown</option>
               <option>Female</option>
               <option>Male</option>
@@ -71,10 +80,11 @@ export function NewIncidentPage() {
         </div>
         <label>
           Destination hospital
-          <select
+          <select aria-label="Destination hospital"
             value={destinationHospitalId}
             onChange={(e) => setDestinationHospitalId(e.target.value)}
           >
+            <option value="">Choose later — required before transport</option>
             {hospitals.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.name} ({h.city})
@@ -83,13 +93,16 @@ export function NewIncidentPage() {
           </select>
         </label>
         <label>
-          Notes
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
+          Initial care notes (optional)
+<textarea aria-label="Initial care notes (optional)" aria-describedby="initial-notes-limit" aria-invalid={notes.length > NARRATIVE_LIMIT} value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
         </label>
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>
+        <p id="initial-notes-limit" className={notes.length > NARRATIVE_LIMIT ? "error" : "form-hint"}>{notes.length} / {NARRATIVE_LIMIT} characters.{notes.length > NARRATIVE_LIMIT && " Shorten the narrative before saving; your text has been kept."}</p>
+        {lookupError && <p className="error" role="alert">Destinations could not be loaded. You can still create a draft and choose one later. <button className="ghost" type="button" onClick={() => setLookupAttempt(value => value + 1)}>Retry hospitals</button></p>}
+        {error && <p className="error" role="alert">{error}</p>}
+        <button type="submit" disabled={loading || notes.length > NARRATIVE_LIMIT}>
           {loading ? 'Creating…' : 'Create draft'}
         </button>
+        </fieldset>
       </form>
     </section>
   );

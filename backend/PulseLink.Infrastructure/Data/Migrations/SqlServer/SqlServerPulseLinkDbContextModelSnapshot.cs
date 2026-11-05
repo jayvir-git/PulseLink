@@ -207,6 +207,10 @@ namespace PulseLink.Infrastructure.Data.Migrations.SqlServer
 
                     b.HasIndex("IncidentId");
 
+                    b.HasIndex("IncidentId", "Action")
+                        .IsUnique()
+                        .HasFilter("[IncidentId] IS NOT NULL AND [Action] = 'HandoffAcknowledged'");
+
                     b.ToTable("AuditEvents");
                 });
 

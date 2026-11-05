@@ -1,0 +1,31 @@
+# Design field records around interrupted care
+
+PulseLink’s paramedic workflow should support short, repeated documentation tasks as care develops. The strongest design direction is to make observation and treatment entry easy to reach, keep saved records nearby, and make save status unmistakable. Care notes need to remain editable throughout the active incident. Transport progression belongs beside this work, with an explicit review before handoff closes clinical editing. The hospital and paramedic screens should share clinical labels and visual structure while prioritizing different tasks: recording in the field and retrieving information at reception. These recommendations are evidence-informed design hypotheses, not clinical validation of PulseLink.
+
+## Recording develops alongside care
+
+Field documentation does not reliably follow an uninterrupted sequence of form pages. The UK ERA study observed variation in the timing and order of electronic entry, including later transcription from temporary notes or memory. Navigation sometimes made it difficult to remember what had already been entered. The researchers interpreted these practices in the context of operational constraints and found limited evidence of an effect on patient care. Their findings support designing for interruptions, but do not establish a universal U.S. paramedic workflow. ([Porter et al., 2020](https://www.ncbi.nlm.nih.gov/books/NBK554285/))
+
+A Danish mixed-methods study likewise described ad hoc entry, device problems, and automatic timestamps that restricted accurate documentation of earlier events. Mandatory field markers could suggest completeness without matching local guidance. This supports avoiding a rigid wizard or a percentage-complete badge based on populated fields. It does not prove that a particular screen arrangement improves care. ([Kjær et al., 2023](https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0293577&type=printable))
+
+For PulseLink, the design inference is a short incident setup followed by direct access to observations, treatments, and care notes. Entry controls precede saved history, so reassessment does not require scrolling past every previous entry. Stable section links permit switching tasks without treating a section as permanently finished. Saved sets remain distinct and appear newest first; a new observation starts blank rather than copying previous values.
+
+## Preserve the meaning of time and missing data
+
+NEMSIS defines separate occurrence times for vital measurements, medication administration, and procedures. Its medication and procedure records also include treatment response. Missing-value categories distinguish information not recorded from information that is inapplicable or explicitly negative. **A save timestamp is not an occurrence timestamp, and an empty field is not a normal finding.** These are data semantics, not a prescribed interface. ([NEMSIS v3.5.1 dictionary](https://www.nemsis.org/media/nemsis_v3/release-3.5.1/DataDictionary/PDFHTML/EMSDEMSTATE/NEMSISDataDictionary.pdf), [dictionary explanation](https://www.nemsis.org/media/nemsis_v3/release-3.5.1/DataDictionary/PDFHTML/EMSDEMSTATE/sample.html))
+
+PulseLink currently assigns vital and intervention timestamps when requests are handled. The bounded redesign therefore labels them “Recorded” and explains that limitation. Earlier event times can be documented in narrative, but this is a temporary free-text accommodation. A future occurrence-time feature needs separate clinical and audit timestamps throughout storage, API, export, and both role views. Neither this redesign nor the existing FHIR-inspired export establishes standards conformance.
+
+## Narrative carries changes and response
+
+NASEMSO’s model guidelines describe narrative as a place for context, observations, patient statements, treatment response, and condition changes that fixed fields do not adequately express. They discuss several documentation formats and require local adaptation. The same guidance emphasizes timed observations, assessments, interventions, and response during transfer. ([NASEMSO model guidelines, pages 13 and 371](https://boards.bsd.dli.mt.gov/_docs/med/National-Model-EMS-Clinical-Guidelines-Version-3.pdf))
+
+PulseLink should therefore offer an explicit save action for an evolving EMS narrative, with concise prompts rather than prefilled assertions. Treatment notes need space for response, reassessment, complications, and relevant timing, and the recorded text must be visible to the receiving team. Structured allergies, usual medications, full patient identity, onset, and treatment response remain product gaps. Notes can carry context; their presence cannot certify that these topics were assessed or that the report is complete.
+
+## Make persistence and closure explicit
+
+The proposed workflow distinguishes unsaved entries, saving, confirmed success, and uncertain results. Failed entries remain available for correction or review. An uncertain treatment submission retains its original request identity so retrying does not create another treatment. A repeat-entry form clears only after confirmed success. These are engineering responses to interruption and duplication risks, not interventions tested by the cited studies.
+
+Before HandedOff closes editing, the interface should expose saved care and destination, explain the consequence, and require unsaved inputs to be saved or explicitly cleared. Record counts describe saved content; they are not clinical readiness scores. Report receipt remains distinct from transfer of clinical responsibility, and the written record supports verbal clarification rather than replacing it. ([AHRQ handoff guidance](https://www.ahrq.gov/teamstepps-program/curriculum/communication/tools/handoff.html))
+
+The next comparison should use realistic interrupted tasks: enter partial observations, record a treatment and response, revise notes after reassessment, recover from a failed or uncertain save, and attempt handoff with a draft. Compare entry effort and retrieval accuracy on the same devices and incidents, then involve working paramedics and receiving clinicians. Shared typography and section order provide continuity; only that evaluation can establish whether the redesign fits the intended crews’ actual work.

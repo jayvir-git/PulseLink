@@ -21,18 +21,39 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedIncidentListDto>> List(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = IncidentListQuery.DefaultPageSize)
+        [FromQuery] int pageSize = IncidentListQuery.DefaultPageSize,
+        [FromQuery] string queue = "all")
     {
         (page, pageSize) = IncidentListQuery.Normalize(page, pageSize);
 
         var filtered = ApplyRoleFilter(db.Incidents.AsNoTracking());
+        if (queue is not ("all" or "incoming" or "arrived" or "awaiting" or "received"))
+            return BadRequest(new { message = "Unknown incident queue." });
+        HospitalQueueCountsDto? counts = null;
+        if (User.IsInRole(AppRoles.HospitalStaff))
+        {
+            counts = new HospitalQueueCountsDto(
+                await filtered.CountAsync(i => i.Status == IncidentStatus.Transporting),
+                await filtered.CountAsync(i => i.Status == IncidentStatus.Arrived),
+                await filtered.CountAsync(i => i.Status == IncidentStatus.HandedOff && !i.AuditEvents.Any(a => a.Action == AuditEvent.ReceiptAction)),
+                await filtered.CountAsync(i => i.Status == IncidentStatus.HandedOff && i.AuditEvents.Any(a => a.Action == AuditEvent.ReceiptAction)));
+        }
+        filtered = queue switch
+        {
+            "incoming" => filtered.Where(i => i.Status == IncidentStatus.Transporting),
+            "arrived" => filtered.Where(i => i.Status == IncidentStatus.Arrived),
+            "awaiting" => filtered.Where(i => i.Status == IncidentStatus.HandedOff && !i.AuditEvents.Any(a => a.Action == AuditEvent.ReceiptAction)),
+            "received" => filtered.Where(i => i.Status == IncidentStatus.HandedOff && i.AuditEvents.Any(a => a.Action == AuditEvent.ReceiptAction)),
+            _ => filtered
+        };
         var totalCount = await filtered.CountAsync();
 
         // Order by UpdatedAtUtc (DateTime) so SQLite and SQL Server both sort in SQL.
         // DateTimeOffset cannot be ORDER BY'd in SQLite; this column exists for that reason.
         var items = await IncidentListQuery
             .ApplyOrderAndPage(
-                filtered.Include(i => i.Agency).Include(i => i.DestinationHospital),
+                filtered.Include(i => i.Agency).Include(i => i.DestinationHospital)
+                    .Include(i => i.AuditEvents.Where(a => a.Action == AuditEvent.ReceiptAction)),
                 page,
                 pageSize)
             .ToListAsync();
@@ -41,7 +62,7 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             items.Select(IncidentMapper.ToSummary).ToList(),
             page,
             pageSize,
-            totalCount));
+            totalCount, counts));
     }
 
     [HttpGet("{id:guid}")]
@@ -379,6 +400,48 @@ public class IncidentsController(PulseLinkDbContext db) : ControllerBase
             return saveError;
         }
         return Ok(IncidentMapper.ToDetail((await LoadDetailAsync(id))!));
+    }
+
+    [HttpPut("{id:guid}/receipt")]
+    [Authorize(Roles = AppRoles.HospitalStaff)]
+    public async Task<ActionResult<AuditEventDto>> AcknowledgeReceipt(Guid id)
+    {
+        var incident = await db.Incidents.AsNoTracking().SingleOrDefaultAsync(i => i.Id == id);
+        if (incident is null) return NotFound();
+        if (!IncidentRoleQueries.HospitalVisibility(CurrentHospitalId()).Compile()(incident)) return Forbid();
+        if (incident.Status != IncidentStatus.HandedOff)
+            return Conflict(new { message = "The EMS handoff must be complete before acknowledging receipt." });
+
+        var receipts = db.AuditEvents.AsNoTracking()
+            .Where(a => a.IncidentId == id && a.Action == AuditEvent.ReceiptAction);
+        var receipt = await receipts.SingleOrDefaultAsync();
+        if (receipt is null)
+        {
+            receipt = new AuditEvent
+            {
+                Id = Guid.NewGuid(), IncidentId = id, ActorUserId = CurrentUserId(),
+                Action = AuditEvent.ReceiptAction, CreatedAt = DateTimeOffset.UtcNow,
+                Details = $"Report received by {User.Identity?.Name ?? CurrentUserId()}"
+            };
+            db.AuditEvents.Add(receipt);
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                // Another staff member may have won after our read.
+                db.ChangeTracker.Clear();
+                var winner = await receipts.SingleOrDefaultAsync();
+                if (winner is null) throw;
+                receipt = winner;
+            }
+            catch (Exception ex) when (IsWriteContention(ex))
+            {
+                return StatusCode(503, new { message = "Database busy. Retry acknowledgment." });
+            }
+        }
+        return Ok(new AuditEventDto(receipt.Id, receipt.ActorUserId, receipt.Action, receipt.Details, receipt.CreatedAt));
     }
 
     [HttpGet("{id:guid}/export")]

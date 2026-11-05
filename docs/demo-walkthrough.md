@@ -17,6 +17,10 @@ Password for all seeded users: `Demo123!`
 1. Sign out, sign in as `hospital@pulselink.demo`
 2. Confirm the incident appears in **Incoming handoffs**
 3. Open it and review clinical summary, vitals, and interventions
+4. After EMS marks it HandedOff, select **Acknowledge receipt**.
+5. Sign back in as the paramedic and reopen the incident. The hospital receipt
+   shows the original staff name and time. An already-open incident needs a refresh.
+   In the browser demo, use the seeded handed-off incident INC-2026-0005.
 
 ## 3) Admin
 

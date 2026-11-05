@@ -74,8 +74,8 @@ const httpApi = {
   agencies: () =>
     request<{ id: string; name: string; region: string }[]>('/api/lookup/agencies'),
 
-  incidents: (page = 1) =>
-    request<PagedIncidentList>(`/api/incidents?page=${page}&pageSize=50`),
+  incidents: (page = 1, queue = 'all') =>
+    request<PagedIncidentList>(`/api/incidents?page=${page}&pageSize=50&queue=${encodeURIComponent(queue)}`),
 
   incident: (id: string) => request<IncidentDetail>(`/api/incidents/${id}`),
 
@@ -114,6 +114,8 @@ const httpApi = {
     }),
 
   exportHandoff: (id: string) => request<unknown>(`/api/incidents/${id}/export`),
+  acknowledgeReceipt: (id: string) =>
+    request<IncidentDetail['auditEvents'][number]>(`/api/incidents/${id}/receipt`, { method: 'PUT' }),
 };
 
 // Demo builds swap the transport, not the screens: every page keeps importing
@@ -127,6 +129,7 @@ export type PagedIncidentList = {
   page: number;
   pageSize: number;
   totalCount: number;
+  queueCounts?: { incoming: number; arrived: number; awaiting: number; received: number };
 };
 
 export type InterventionOperation = {
@@ -136,6 +139,7 @@ export type InterventionOperation = {
 };
 
 export type IncidentSummary = {
+  receiptAcknowledged?: boolean;
   id: string;
   incidentNumber: string;
   status: string;

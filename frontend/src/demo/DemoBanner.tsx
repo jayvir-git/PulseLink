@@ -7,17 +7,12 @@ export function DemoBanner() {
   if (!IS_DEMO) return null;
 
   return (
-    <div className="demo-banner" role="status">
+    <aside className="demo-banner" aria-label="Demo environment">
       <span>
-        <strong>Demo:</strong> this runs entirely in your browser. There is no server and no
-        database, and nothing you enter leaves this device. The same rules, including the status
-        machine, version conflicts and idempotent retries, are implemented in C# and verified in CI
-        against SQLite and SQL Server.
+        <strong>Interactive demo</strong> · Fictional patients. Browser-only data.
       </span>
       <span className="demo-banner-actions">
-        <a href="https://github.com/jayvir-git/PulseLink/tree/main/backend/PulseLink.Tests" target="_blank" rel="noreferrer">
-          See the tests
-        </a>
+        <details><summary>About this demo</summary><p>No server or database is connected. What you enter stays in this browser. The API’s rules are verified separately against SQLite and SQL Server. <a href="https://github.com/jayvir-git/PulseLink/tree/main/backend/PulseLink.Tests" target="_blank" rel="noreferrer">See the tests</a></p></details>
         <button
           type="button"
           className="ghost"
@@ -29,6 +24,6 @@ export function DemoBanner() {
           Reset demo data
         </button>
       </span>
-    </div>
+    </aside>
   );
 }
